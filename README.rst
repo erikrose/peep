@@ -47,15 +47,14 @@ Switching to Peep
 
     Not proceeding to installation.
 2. Vet the packages coming off PyPI in whatever way you typically do.
-3. Add the recommended hash lines to your ``requirements.txt``, each one
-   directly above the requirement it applies to. The hashes are URL-safe base64
-   encodings of the SHA-256 of the original compressed tarball from PyPI, with
-   trailing equal signs stripped off.
+3. Add the recommended hash lines to your requirements.txt, each one
+   directly above the requirement it applies to. (The hashes are of the
+   original, compressed tarballs from PyPI.)
 4. In the future, always use ``peep install`` to install your project. You are
    now cryptographically safe!
 
 
-The Fearsome Message
+The Fearsome Warning
 ====================
 
 If, during installation, a hash doesn't match, ``peep`` will say something like
@@ -89,6 +88,11 @@ Version History
 
 0.2
   * Fix repeated-logging bug.
+  * Fix spurious error message about not having any requirements files.
+  * Pass pip's exit code through to the outside for calls to non-``install``
+    subcommands.
+  * Improve spacing in the final output.
+
 
 0.1
   * Proof of concept. Does all the crypto stuff. Should be secure. Some rough
