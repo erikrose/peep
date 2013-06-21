@@ -71,12 +71,17 @@ this::
 ...and will exit with a status of 1. Freak out appropriately.
 
 
-Other Things
-============
+Other Niceties
+==============
 
-``peep`` implicitly turns out ``--no-deps``, because obviously you'll need to
-list all your packages in your requirements file in order to specify hashes for
-all of them.
+* ``peep`` implicitly turns on pip's ``--no-deps`` option, because obviously
+  you'll need to list all your packages in your requirements file in order to
+  specify hashes for all of them.
+* All non-install commands just fall through to pip, so you can use ``peep``
+  all the time if you want. This comes in handy for existing scripts that have
+  a big ``$PIP=/path/to/pip`` at the top.
+* ``peep``-compatible requirements files remain entirely usable with ``pip``,
+  because the hashes are just comments, after all.
 
 
 Version History
