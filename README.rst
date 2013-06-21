@@ -87,6 +87,9 @@ Other Niceties
 Version History
 ===============
 
+0.2
+  * Fix repeated-logging bug.
+
 0.1
   * Proof of concept. Does all the crypto stuff. Should be secure. Some rough
     edges in the UI.
