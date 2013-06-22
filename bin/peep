@@ -95,7 +95,7 @@ def hashes_of_downloads(temp_path):
     for filename in listdir(temp_path):
         with open(join(temp_path, filename), 'r') as archive:
             sha = sha256()
-            package_name = filename[:filename.rindex('-')]  # TODO: Does this always works?
+            package_name = filename[:filename.rindex('-')]  # TODO: Does this always work?
             while True:
                 data = archive.read(2**20)
                 if not data:
@@ -144,7 +144,7 @@ def hashes_of_requirements(paths):
             if line_number > 1:
                 previous_line = getline(path, line_number - 1)
                 if previous_line.startswith('# sha256: '):
-                    expected_hashes[req.name] = previous_line.split(':')[1].strip()
+                    expected_hashes[req.name] = previous_line.split(':', 1)[1].strip()
                     continue
             missing_hashes.append(req.name)
     return expected_hashes, missing_hashes
