@@ -24,6 +24,9 @@ comments and peace of mind.
 Switching to Peep
 =================
 
+0. Install ``peep``::
+
+    pip install peep
 1. Use ``peep install -r requirements.txt`` to install your project once.
    You'll get output like this::
 
