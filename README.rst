@@ -53,8 +53,8 @@ Switching to Peep
 3. Add the recommended hash lines to your requirements.txt, each one
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
-4. In the future, always use ``peep install`` to install your project. You are
-   now cryptographically safe!
+4. In the future, always use ``peep install`` to install your requirements. You
+   are now cryptographically safe!
 
 
 The Fearsome Warning
