@@ -90,8 +90,9 @@ Version History
 ===============
 
 0.2.1
-  * Add a shebang line so you can actually run ``peep`` after ``pip
-    install``ing it. Sorry, folks; I was doing ``setup.py develop``!
+  * Add a shebang line so you can actually run ``peep`` after doing ``pip
+    install peep``. Sorry, folks, I was doing ``setup.py develop`` on my own
+    box.
 
 0.2
   * Fix repeated-logging bug.
@@ -99,7 +100,6 @@ Version History
   * Pass pip's exit code through to the outside for calls to non-``install``
     subcommands.
   * Improve spacing in the final output.
-
 
 0.1
   * Proof of concept. Does all the crypto stuff. Should be secure. Some rough
