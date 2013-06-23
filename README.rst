@@ -70,7 +70,7 @@ this::
         futures: expected goofYhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
                       got YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
 
-...and will exit with a status of 1. Freak out appropriately.
+It will then exit with a status of 1. Freak out appropriately.
 
 
 Other Niceties
@@ -88,6 +88,10 @@ Other Niceties
 
 Version History
 ===============
+
+0.2.1
+  * Add a shebang line so you can actually run ``peep`` after ``pip
+    install``ing it. Sorry, folks; I was doing ``setup.py develop``!
 
 0.2
   * Fix repeated-logging bug.
