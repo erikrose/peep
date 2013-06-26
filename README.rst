@@ -2,23 +2,24 @@
 Peep
 ====
 
-Historically, deploying Python projects has been a pain in the neck if you want
-any kind of security. PyPI lets package authors change the contents of their
-packages without revving the version number, and, until very recently, there
-was no support for HTTPS, leaving it open to man-in-the-middle attacks. If you
-wanted to guarantee known-good dependencies for your deployment, you had to
-either run a local PyPI mirror, manually uploading packages as you vetted them,
-or you had to check everything into a vendor library, necessitating a lot of
-fooling around with your VCS (or maintaining custom tooling) to do upgrades.
+Historically, deploying Python projects has been a pain in the neck for the
+security-conscious. First, PyPI lets authors change the contents of their
+packages without revving their version numbers. Second, any future compromise
+of PyPI or its caching CDN means you could get a package that's different from
+the one you signed up for. If you wanted to guarantee known-good dependencies
+for your deployment, you had to either run a local PyPI mirror, manually
+uploading packages as you vetted them, or else check everything into a vendor
+library, necessitating a lot of fooling around with your VCS (or maintaining
+custom tooling) to do upgrades.
 
 Peep fixes all that.
 
 Vet your packages, put hashes of the PyPI-sourced tarballs into
-requirements.txt, use ``peep install`` instead of ``pip install``, and let the
-crypto do the rest. If a downloaded package doesn't match the hash, ``peep``
-will freak out, and installation will go no further. No servers to maintain, no
-enormous vendor libs to wrestle. Just requirements.txt with some funny-looking
-comments and peace of mind.
+``requirements.txt``, use ``peep install`` instead of ``pip install``, and let
+the crypto do the rest. If a downloaded package doesn't match the hash,
+``peep`` will freak out, and installation will go no further. No servers to
+maintain, no enormous vendor libs to wrestle. Just ``requirements.txt`` with
+some funny-looking comments and peace of mind.
 
 
 Switching to Peep
@@ -27,7 +28,11 @@ Switching to Peep
 0. Install ``peep``::
 
     pip install peep
-1. Use ``peep install -r requirements.txt`` to install your project once.
+1. Use ``peep`` to install your project once::
+
+        cd yourproject
+        peep install -r requirements.txt
+
    You'll get output like this::
 
     <a bunch of pip output>
@@ -50,7 +55,7 @@ Switching to Peep
 
     Not proceeding to installation.
 2. Vet the packages coming off PyPI in whatever way you typically do.
-3. Add the recommended hash lines to your requirements.txt, each one
+3. Add the recommended hash lines to your ``requirements.txt``, each one
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
 4. In the future, always use ``peep install`` to install your requirements. You
@@ -67,8 +72,8 @@ this::
     REQUIREMENTS FILE. If you have updated the package versions, update the
     hashes. If not, freak out, because someone has tampered with the packages.
 
-        futures: expected goofYhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
-                      got YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
+        requests: expected FWvz7Ce6nsfgz4--AoCHGAmdIY3kA-tkpxTXO6GimrE
+                       got YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
 
 It will then exit with a status of 1. Freak out appropriately.
 
@@ -76,9 +81,8 @@ It will then exit with a status of 1. Freak out appropriately.
 Other Niceties
 ==============
 
-* ``peep`` implicitly turns on pip's ``--no-deps`` option, because obviously
-  you'll need to list all your packages in your requirements file in order to
-  specify hashes for all of them.
+* ``peep`` implicitly turns on pip's ``--no-deps`` option so unverified
+  dependencies of your requirements can't sneak through.
 * All non-install commands just fall through to pip, so you can use ``peep``
   all the time if you want. This comes in handy for existing scripts that have
   a big ``$PIP=/path/to/pip`` at the top.

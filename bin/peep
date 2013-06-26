@@ -79,7 +79,7 @@ def pip_download(argv, temp_path):
     run_pip(argv)
 
 
-def pip_install_archives_in(temp_path):
+def pip_install_archives_from(temp_path):
     """pip install the archives from the ``temp_path`` dir, omitting
     dependencies."""
     # TODO: Make this preserve any pip options passed in, but strip off -r
@@ -152,6 +152,9 @@ def hashes_of_requirements(paths):
 
 
 def hash_mismatches(expected_hashes, downloaded_hashes):
+    """Yield the expected hash, package name, and download-hash of each
+    package whose download-hash didn't match the one specified for it in the
+    requirments file."""
     for package_name, expected_hash in expected_hashes.iteritems():
         hash_of_download = downloaded_hashes[package_name]
         if hash_of_download != expected_hash:
@@ -211,7 +214,7 @@ def main():
                 print 'Not proceeding to installation.'
                 return SOMETHING_WENT_WRONG
             else:
-                pip_install_archives_in(temp_path)
+                pip_install_archives_from(temp_path)
     except PipException as exc:
         return exc.error_code
     return ITS_FINE_ITS_FINE
