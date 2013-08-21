@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """peep ("prudently examine every package") verifies that packages conform to a
 trusted, locally stored hash and only then installs them::
 
@@ -218,7 +217,3 @@ def main():
     except PipException as exc:
         return exc.error_code
     return ITS_FINE_ITS_FINE
-
-
-if __name__ == '__main__':
-    exit(main())

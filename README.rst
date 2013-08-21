@@ -93,6 +93,10 @@ Other Niceties
 Version History
 ===============
 
+0.2.2
+  * Switch to a ``console_scripts`` entrypoint so we have a chance of running
+    on non-Unix OSes.
+
 0.2.1
   * Add a shebang line so you can actually run ``peep`` after doing ``pip
     install peep``. Sorry, folks, I was doing ``setup.py develop`` on my own
