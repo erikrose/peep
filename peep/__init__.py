@@ -89,19 +89,46 @@ def pip_install_archives_from(temp_path):
         run_pip(['install', '--no-deps', archive_path])
 
 
+def package_from_filename(filename):
+    return filename[:filename.rindex('-')]  # TODO: Does this always work?
+
+
 def hashes_of_downloads(temp_path):
-    """Return a dict of package names pointing to hashes of their archives."""
+    """Return a dict of package names pointing to the hashes of their
+    archives."""
     ret = {}
     for filename in listdir(temp_path):
         with open(join(temp_path, filename), 'r') as archive:
             sha = sha256()
-            package_name = filename[:filename.rindex('-')]  # TODO: Does this always work?
             while True:
-                data = archive.read(2**20)
+                data = archive.read(2 ** 20)
                 if not data:
                     break
                 sha.update(data)
-        ret[package_name] = encoded_hash(sha)
+        ret[package_from_filename(filename)] = encoded_hash(sha)
+    return ret
+
+
+def versions_of_downloads(temp_path):
+    """Return a dict of package names pointing to version numbers."""
+    def version_from_filename(filename):
+        """Return the version number of a PEP-386-compliant package, given its
+        archive filename.
+
+        If the version number can't be determined, return ''.
+
+        """
+        _, right_of_dash = filename.rsplit('-', 1)
+        match = re.match(r'([0-9]+(?:\.[0-9]+){1,2}(?:[ab][0-9]+)?)'
+                         r'\.(?:tar\.gz|tgz|tar|zip)',
+                         right_of_dash)  # leaning on regex cache here
+        if match:
+            return match.group(1)
+        return ''
+
+    ret = {}
+    for filename in listdir(temp_path):
+        ret[package_from_filename(filename)] = version_from_filename(filename)
     return ret
 
 
@@ -181,6 +208,7 @@ def main():
         with ephemeral_dir() as temp_path:
             pip_download(argv, temp_path)
             downloaded_hashes = hashes_of_downloads(temp_path)
+            downloaded_versions = versions_of_downloads(temp_path)
             expected_hashes, missing_hashes = hashes_of_requirements(req_paths)
             mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
 
@@ -207,7 +235,9 @@ def main():
                 print 'The following packages had no hashes specified in the requirements file, which leaves them open to tampering. Vet these packages to your satisfaction, then add these "sha256" lines like so:\n'
             for package_name in missing_hashes:
                 print '    # sha256: %s' % downloaded_hashes[package_name]
-                print '    %s==x.y.z\n' % package_name  # TODO: Print actual lines.
+                print '    %s==%s\n' % (package_name,
+                                        downloaded_versions[package_name] or
+                                            'x.y.z')
 
             if mismatches or missing_hashes:
                 print 'Not proceeding to installation.'

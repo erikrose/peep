@@ -7,8 +7,8 @@ security-conscious. First, PyPI lets authors change the contents of their
 packages without revving their version numbers. Second, any future compromise
 of PyPI or its caching CDN means you could get a package that's different from
 the one you signed up for. If you wanted to guarantee known-good dependencies
-for your deployment, you had to either run a local PyPI mirror, manually
-uploading packages as you vetted them, or else check everything into a vendor
+for your deployment, you had to either run a local PyPI mirror--manually
+uploading packages as you vetted them--or else check everything into a vendor
 library, necessitating a lot of fooling around with your VCS (or maintaining
 custom tooling) to do upgrades.
 
@@ -41,17 +41,17 @@ Switching to Peep
     which leaves them open to tampering. Vet these packages to your
     satisfaction, then add these "sha256" lines like so:
 
+        # sha256: L9XU_-gfdi3So-WEctaQoNu6N2Z3ZQYAOu4-16qor-8
+        Flask==0.9
+
+        # sha256: YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
+        futures==2.1.3
+
         # sha256: qF4YU3XbdcEJ-Z7N49VUFfA15waKgiUs9PFsZnrDj0k
-        Jinja2==x.y.z
+        Jinja2==2.6
 
         # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
-        Pygments==x.y.z
-
-        # sha256: EIw9QftwHEr07wDo677cFHYyyCJHvreYyNhlehKBAgY
-        Werkzeug==x.y.z
-
-        # sha256: FWvz7Ce6nsfgz4--AoCHGAmdIY3kA-tkpxTXO6GimrE
-        requests==x.y.z
+        Pygments==1.4
 
     Not proceeding to installation.
 2. Vet the packages coming off PyPI in whatever way you typically do.
@@ -93,9 +93,10 @@ Other Niceties
 Version History
 ===============
 
-0.2.2
-  * Switch to a ``console_scripts`` entrypoint so we have a chance of running
-    on non-Unix OSes.
+0.3
+  * Support Windows and other non-Unix OSes.
+  * The hash output now includes the actual version numbers of packages, so you
+    can just paste it straight into your ``requirements.txt``.
 
 0.2.1
   * Add a shebang line so you can actually run ``peep`` after doing ``pip
