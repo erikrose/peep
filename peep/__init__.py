@@ -90,7 +90,8 @@ def pip_install_archives_from(temp_path):
 
 
 def package_from_filename(filename):
-    return filename[:filename.rindex('-')]  # TODO: Does this always work?
+    # TODO: Doesn't always work: sqlalchemy-citext-1.0-2.tar.gz
+    return filename[:filename.rindex('-')]
 
 
 def hashes_of_downloads(temp_path):
@@ -234,12 +235,13 @@ def main():
             if missing_hashes:
                 print 'The following packages had no hashes specified in the requirements file, which leaves them open to tampering. Vet these packages to your satisfaction, then add these "sha256" lines like so:\n'
             for package_name in missing_hashes:
-                print '    # sha256: %s' % downloaded_hashes[package_name]
-                print '    %s==%s\n' % (package_name,
-                                        downloaded_versions[package_name] or
-                                            'x.y.z')
+                print '# sha256: %s' % downloaded_hashes[package_name]
+                print '%s==%s\n' % (package_name,
+                                    downloaded_versions[package_name] or
+                                        'x.y.z')
 
             if mismatches or missing_hashes:
+                print '-------------------------------'
                 print 'Not proceeding to installation.'
                 return SOMETHING_WENT_WRONG
             else:

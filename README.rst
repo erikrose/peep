@@ -93,6 +93,10 @@ Other Niceties
 Version History
 ===============
 
+0.3.1
+  * Remove indentation from hash output so you don't have to dedent it after
+    pasting it into requirements.txt.
+
 0.3
   * Support Windows and other non-Unix OSes.
   * The hash output now includes the actual version numbers of packages, so you
