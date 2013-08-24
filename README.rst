@@ -41,18 +41,19 @@ Switching to Peep
     which leaves them open to tampering. Vet these packages to your
     satisfaction, then add these "sha256" lines like so:
 
-        # sha256: L9XU_-gfdi3So-WEctaQoNu6N2Z3ZQYAOu4-16qor-8
-        Flask==0.9
+    # sha256: L9XU_-gfdi3So-WEctaQoNu6N2Z3ZQYAOu4-16qor-8
+    Flask==0.9
 
-        # sha256: YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
-        futures==2.1.3
+    # sha256: YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
+    futures==2.1.3
 
-        # sha256: qF4YU3XbdcEJ-Z7N49VUFfA15waKgiUs9PFsZnrDj0k
-        Jinja2==2.6
+    # sha256: qF4YU3XbdcEJ-Z7N49VUFfA15waKgiUs9PFsZnrDj0k
+    Jinja2==2.6
 
-        # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
-        Pygments==1.4
+    # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
+    Pygments==1.4
 
+    -------------------------------
     Not proceeding to installation.
 2. Vet the packages coming off PyPI in whatever way you typically do.
 3. Add the recommended hash lines to your ``requirements.txt``, each one
@@ -93,7 +94,10 @@ Other Niceties
 Version History
 ===============
 
-0.3.1
+0.4
+  * Rework how peep downloads files and determines versions so we can tolerate
+    PEP-386-noncompliant package version numbers. This amounted to a minor
+    rewrite.
   * Remove indentation from hash output so you don't have to dedent it after
     pasting it into requirements.txt.
 

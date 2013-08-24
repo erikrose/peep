@@ -11,11 +11,12 @@ hashes in requirements.txt, and you're all set.
 from base64 import urlsafe_b64encode
 from contextlib import contextmanager
 from hashlib import sha256
+from itertools import chain
 from linecache import getline
-from optparse import OptionParser
 from os import listdir
-from os.path import join
+from os.path import join, basename
 import re
+import shlex
 from shutil import rmtree
 from sys import argv, exit
 from tempfile import mkdtemp
@@ -66,16 +67,36 @@ def run_pip(initial_args):
         raise PipException(status_code)
 
 
-def pip_download(argv, temp_path):
-    """Download packages to the dir specified by ``temp_path``."""
-    argv = argv[1:]  # copy and strip off binary name
-    argv[1:1] = ['--no-deps', '--download', temp_path]
+def pip_download(req, argv, temp_path):
+    """Download a package, and return its filename.
+
+    :arg req: The InstallRequirement which describes the package
+    :arg argv: Arguments to be passed along to pip
+    :arg temp_path: The path to the directory to download to
+
+    """
+    # Get the original line out of the reqs file:
+    line = getline(*requirements_path_and_line(req))
+
+    # Copy and strip off binary name. Remove any requirement file args.
+    argv = ([argv[1]] +  # "install"
+            ['--no-deps', '--download', temp_path] +
+            list(requirement_args(argv[2:], want_other=True)) +  # other args
+            shlex.split(line))  # ['nose==1.3.0']. split() removes trailing \n.
+                                # TODO: Did I break Windows?
+
+    # Remember what was in the dir so we can backtrack and tell what we've
+    # downloaded (disgusting):
+    old_contents = set(listdir(temp_path))
+
     # pip downloads the tarball into a second temp dir it creates, then it
     # copies it to our specified download dir, then it unpacks it into the
     # build dir in the venv (probably to read metadata out of it), then it
     # deletes that. Don't be afraid: the tarball we're hashing is the pristine
     # one downloaded from PyPI, not a fresh tarring of unpacked files.
     run_pip(argv)
+
+    return (set(listdir(temp_path)) - old_contents).pop()
 
 
 def pip_install_archives_from(temp_path):
@@ -89,92 +110,79 @@ def pip_install_archives_from(temp_path):
         run_pip(['install', '--no-deps', archive_path])
 
 
-def package_from_filename(filename):
-    # TODO: Doesn't always work: sqlalchemy-citext-1.0-2.tar.gz
-    return filename[:filename.rindex('-')]
+def hash_of_file(path):
+    """Return the hash of a downloaded file."""
+    with open(path, 'r') as archive:
+        sha = sha256()
+        while True:
+            data = archive.read(2 ** 20)
+            if not data:
+                break
+            sha.update(data)
+    return encoded_hash(sha)
 
 
-def hashes_of_downloads(temp_path):
-    """Return a dict of package names pointing to the hashes of their
-    archives."""
-    ret = {}
-    for filename in listdir(temp_path):
-        with open(join(temp_path, filename), 'r') as archive:
-            sha = sha256()
-            while True:
-                data = archive.read(2 ** 20)
-                if not data:
-                    break
-                sha.update(data)
-        ret[package_from_filename(filename)] = encoded_hash(sha)
-    return ret
+def version_of_archive(filename, package_name):
+    """Deduce the version number of a downloaded package from its filename."""
+    # Since we know the project_name, we can strip that off the left, strip any
+    # archive extensions off the right, and take the rest as the version.
+    extensions = ['.tar.gz', '.tgz', '.tar', '.zip']
+    for ext in extensions:
+        if filename.endswith(ext):
+            filename = filename[:-len(ext)]
+            break
+    if not filename.startswith(package_name):
+        # TODO: What about safe/unsafe names?
+        raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me.")
+    return filename[len(package_name) + 1:]  # Strip off '-' before version.
 
 
-def versions_of_downloads(temp_path):
-    """Return a dict of package names pointing to version numbers."""
-    def version_from_filename(filename):
-        """Return the version number of a PEP-386-compliant package, given its
-        archive filename.
-
-        If the version number can't be determined, return ''.
-
-        """
-        _, right_of_dash = filename.rsplit('-', 1)
-        match = re.match(r'([0-9]+(?:\.[0-9]+){1,2}(?:[ab][0-9]+)?)'
-                         r'\.(?:tar\.gz|tgz|tar|zip)',
-                         right_of_dash)  # leaning on regex cache here
-        if match:
-            return match.group(1)
-        return ''
-
-    ret = {}
-    for filename in listdir(temp_path):
-        ret[package_from_filename(filename)] = version_from_filename(filename)
-    return ret
-
-
-def requirement_paths(argv):
-    """Return a list of paths to requirements files from the args.
-
-    If none, return [].
-
+def requirement_args(argv, want_paths=False, want_other=False):
+    """Return an iterable of filtered arguments.
+    
+    :arg want_paths: If True, the returned iterable includes the paths to any
+        requirements files following a ``-r`` or ``--requirement`` option.
+    :arg want_other: If True, the returned iterable includes the args that are
+        not a requirement-file path or a ``-r`` or ``--requirement`` flag.
+    
     """
     was_r = False
-    ret = []
-    for arg in argv[1:]:
+    for arg in argv:
         # Allow for requirements files named "-r", don't freak out if there's a
         # trailing "-r", etc.
         if was_r:
-            ret.append(arg)
+            if want_paths:
+                yield arg
             was_r = False
         elif arg in ['-r', '--requirement']:
             was_r = True
-    return ret
+        else:
+            if want_other:
+                yield arg
 
 
-def hashes_of_requirements(paths):
+def requirements_path_and_line(req):
+    """Return the path and line number of the file from which an
+    InstallRequirement came."""
+    path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
+                  req.comes_from).groups())
+    return path, int(line)
+
+
+def hashes_of_requirements(requirements):
     """Return a map of package names to expected hashes, given multiple
     requirements files."""
-    def path_and_line(req):
-        """Return the path and line number of the file from which an
-        InstallRequirement came."""
-        path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
-                      req.comes_from).groups())
-        return path, int(line)
-
     expected_hashes = {}
     missing_hashes = []
 
-    for path in paths:
-        reqs = parse_requirements(path)
-        for req in reqs:  # InstallRequirements
-            path, line_number = path_and_line(req)
-            if line_number > 1:
-                previous_line = getline(path, line_number - 1)
-                if previous_line.startswith('# sha256: '):
-                    expected_hashes[req.name] = previous_line.split(':', 1)[1].strip()
-                    continue
-            missing_hashes.append(req.name)
+    for req in requirements:  # InstallRequirements
+        path, line_number = requirements_path_and_line(req)
+        if line_number > 1:
+            previous_line = getline(path, line_number - 1)
+            if previous_line.startswith('# sha256: '):
+                expected_hashes[req.name] = previous_line.split(':', 1)[1].strip()
+                continue
+        missing_hashes.append(req.name)
     return expected_hashes, missing_hashes
 
 
@@ -200,17 +208,24 @@ def main():
             # Fall through to top-level pip main() for everything else:
             return pip.main()
 
-        req_paths = requirement_paths(argv)
+        req_paths = list(requirement_args(argv[1:], want_paths=True))
         if not req_paths:
             print "You have to specify one or more requirements files with the -r option, because otherwise there's nowhere for peep to look up the hashes."
             return COMMAND_LINE_ERROR
 
         # We're a "peep install" command, and we have some requirement paths.
+
+        requirements = list(chain(*(parse_requirements(path) for
+                                    path in req_paths)))
+        downloaded_hashes, downloaded_versions = {}, {}
         with ephemeral_dir() as temp_path:
-            pip_download(argv, temp_path)
-            downloaded_hashes = hashes_of_downloads(temp_path)
-            downloaded_versions = versions_of_downloads(temp_path)
-            expected_hashes, missing_hashes = hashes_of_requirements(req_paths)
+            for req in requirements:
+                name = req.req.project_name
+                archive_filename = pip_download(req, argv, temp_path)
+                downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
+                downloaded_versions[name] = version_of_archive(archive_filename, name)
+
+            expected_hashes, missing_hashes = hashes_of_requirements(requirements)
             mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
 
             # Skip a line after pip's "Cleaning up..." so the important stuff
@@ -237,8 +252,7 @@ def main():
             for package_name in missing_hashes:
                 print '# sha256: %s' % downloaded_hashes[package_name]
                 print '%s==%s\n' % (package_name,
-                                    downloaded_versions[package_name] or
-                                        'x.y.z')
+                                    downloaded_versions[package_name])
 
             if mismatches or missing_hashes:
                 print '-------------------------------'
