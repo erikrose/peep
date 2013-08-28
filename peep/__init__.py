@@ -83,7 +83,6 @@ def pip_download(req, argv, temp_path):
             ['--no-deps', '--download', temp_path] +
             list(requirement_args(argv[2:], want_other=True)) +  # other args
             shlex.split(line))  # ['nose==1.3.0']. split() removes trailing \n.
-                                # TODO: Did I break Windows?
 
     # Remember what was in the dir so we can backtrack and tell what we've
     # downloaded (disgusting):
