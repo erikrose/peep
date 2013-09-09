@@ -91,8 +91,39 @@ Other Niceties
   because the hashes are just comments, after all.
 
 
+Troubleshooting
+===============
+
+Are you suddenly getting the Fearsome Warning? Maybe you're really in trouble,
+but maybe something more innocuous is happening.
+
+Some packages offer downloads in multiple formats: for example, zips and
+tarballs. Pip is currently unpredictable in its choice of archive in such
+situations. Thus, some packages have more than one valid hash for a given
+version. To allow for these, you can stack up multiple known-good hashes above
+a requirement, as long as they are within a contiguous block of commented
+lines::
+
+    # Tarball:
+    # sha256: lvpN706AIAvoJ8P1EUfdez-ohzuSB-MyXUe6Rb8ppcE
+    #
+    # And the zip file:
+    # sha256: 6QTt-5DahBKcBiUs06BfkLTuvBu1uF7pblb_bPaUONU
+    mock==0.8.0
+
+A future version of peep will emit all the applicable hashes as suggestions, to
+save you the effort of manually identifying such packages. Or, more likely, we
+will simply correct pip's capriciousness in a future version of it.
+https://github.com/pypa/pip/issues/1194 is the bug to watch.
+
+
 Version History
 ===============
+
+0.5
+  * Allow multiple acceptable hashes for a package. This works around pip's
+    unpredictable treatment of packages like mock, which provide equivalent
+    zips and tarballs: https://github.com/pypa/pip/issues/1194.
 
 0.4
   * Rework how peep downloads files and determines versions so we can tolerate

@@ -138,12 +138,12 @@ def version_of_archive(filename, package_name):
 
 def requirement_args(argv, want_paths=False, want_other=False):
     """Return an iterable of filtered arguments.
-    
+
     :arg want_paths: If True, the returned iterable includes the paths to any
         requirements files following a ``-r`` or ``--requirement`` option.
     :arg want_other: If True, the returned iterable includes the args that are
         not a requirement-file path or a ``-r`` or ``--requirement`` flag.
-    
+
     """
     was_r = False
     for arg in argv:
@@ -169,30 +169,43 @@ def requirements_path_and_line(req):
 
 
 def hashes_of_requirements(requirements):
-    """Return a map of package names to expected hashes, given multiple
-    requirements files."""
+    """Return a map of package names to lists of known-good hashes, given
+    multiple requirements files."""
+    def hashes_above(path, line_number):
+        """Yield hashes from contiguous comment lines before line
+        ``line_number``."""
+        for line_number in xrange(line_number - 1, 0, -1):
+            # If we hit a non-comment line, abort:
+            line = getline(path, line_number)
+            if not line.startswith('#'):
+                break
+
+            # If it's a hash line, add it to the pile:
+            if line.startswith('# sha256: '):
+                yield line.split(':', 1)[1].strip()
+
     expected_hashes = {}
     missing_hashes = []
 
     for req in requirements:  # InstallRequirements
         path, line_number = requirements_path_and_line(req)
-        if line_number > 1:
-            previous_line = getline(path, line_number - 1)
-            if previous_line.startswith('# sha256: '):
-                expected_hashes[req.name] = previous_line.split(':', 1)[1].strip()
-                continue
-        missing_hashes.append(req.name)
+        hashes = list(hashes_above(path, line_number))
+        if hashes:
+            hashes.reverse()  # because we read them backwards
+            expected_hashes[req.name] = hashes
+        else:
+            missing_hashes.append(req.name)
     return expected_hashes, missing_hashes
 
 
-def hash_mismatches(expected_hashes, downloaded_hashes):
-    """Yield the expected hash, package name, and download-hash of each
-    package whose download-hash didn't match the one specified for it in the
-    requirments file."""
-    for package_name, expected_hash in expected_hashes.iteritems():
+def hash_mismatches(expected_hash_map, downloaded_hashes):
+    """Yield the list of allowed hashes, package name, and download-hash of
+    each package whose download-hash didn't match one allowed for it in the
+    requirements file."""
+    for package_name, expected_hashes in expected_hash_map.iteritems():
         hash_of_download = downloaded_hashes[package_name]
-        if hash_of_download != expected_hash:
-            yield expected_hash, package_name, hash_of_download
+        if hash_of_download not in expected_hashes:
+            yield expected_hashes, package_name, hash_of_download
 
 
 def main():
@@ -235,13 +248,14 @@ def main():
             # Mismatched hashes:
             if mismatches:
                 print "THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE REQUIREMENTS FILE. If you have updated the package versions, update the hashes. If not, freak out, because someone has tampered with the packages.\n"
-            for expected_hash, package_name, hash_of_download in mismatches:
+            for expected_hashes, package_name, hash_of_download in mismatches:
                 hash_of_download = downloaded_hashes[package_name]
-                if hash_of_download != expected_hash:
-                    print '    %s: expected %s' % (
-                            package_name,
-                            expected_hash)
-                    print ' ' * (5 + len(package_name)), '     got', hash_of_download
+                preamble = '    %s: expected%s' % (
+                        package_name,
+                        ' one of' if len(expected_hashes) > 1 else '')
+                print preamble,
+                print ('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes)
+                print ' ' * (len(preamble) - 4), 'got', hash_of_download
             if mismatches:
                 print  # Skip a line before "Not proceeding..."
 
