@@ -99,7 +99,7 @@ Version History
     PEP-386-noncompliant package version numbers. This amounted to a minor
     rewrite.
   * Remove indentation from hash output so you don't have to dedent it after
-    pasting it into requirements.txt.
+    pasting it into ``requirements.txt``.
 
 0.3
   * Support Windows and other non-Unix OSes.
