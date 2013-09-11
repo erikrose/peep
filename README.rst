@@ -129,6 +129,8 @@ Version History
 
 0.6
   * Add ``peep hash`` subcommand.
+  * Require pip>=1.2, as lower versions have a bug that causes a crash on
+    ``peep install``.
 
 0.5
   * Allow multiple acceptable hashes for a package. This works around PyPI's

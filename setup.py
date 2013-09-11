@@ -17,7 +17,7 @@ setup(
         },
     url='https://github.com/erikrose/peep',
     include_package_data=True,
-    install_requires=['pip'],
+    install_requires=['pip>=1.2'],
     classifiers=[
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
