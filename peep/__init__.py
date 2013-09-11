@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from hashlib import sha256
 from itertools import chain
 from linecache import getline
+from optparse import OptionParser
 from os import listdir
 from os.path import join, basename
 import re
@@ -24,6 +25,12 @@ from tempfile import mkdtemp
 import pip
 from pip.log import logger
 from pip.req import parse_requirements
+
+
+ITS_FINE_ITS_FINE = 0
+SOMETHING_WENT_WRONG = 1
+# "Traditional" for command-line errors according to optparse docs:
+COMMAND_LINE_ERROR = 2
 
 
 class PipException(Exception):
@@ -71,7 +78,8 @@ def pip_download(req, argv, temp_path):
     """Download a package, and return its filename.
 
     :arg req: The InstallRequirement which describes the package
-    :arg argv: Arguments to be passed along to pip
+    :arg argv: Arguments to be passed along to pip, starting after the
+        subcommand
     :arg temp_path: The path to the directory to download to
 
     """
@@ -79,9 +87,8 @@ def pip_download(req, argv, temp_path):
     line = getline(*requirements_path_and_line(req))
 
     # Copy and strip off binary name. Remove any requirement file args.
-    argv = ([argv[1]] +  # "install"
-            ['--no-deps', '--download', temp_path] +
-            list(requirement_args(argv[2:], want_other=True)) +  # other args
+    argv = (['install', '--no-deps', '--download', temp_path] +
+            list(requirement_args(argv, want_other=True)) +  # other args
             shlex.split(line))  # ['nose==1.3.0']. split() removes trailing \n.
 
     # Remember what was in the dir so we can backtrack and tell what we've
@@ -208,71 +215,100 @@ def hash_mismatches(expected_hash_map, downloaded_hashes):
             yield expected_hashes, package_name, hash_of_download
 
 
-def main():
-    """Implement "peep install". Return a shell status code."""
-    ITS_FINE_ITS_FINE = 0
-    SOMETHING_WENT_WRONG = 1
-    # "Traditional" for command-line errors according to optparse docs:
-    COMMAND_LINE_ERROR = 2
+def peep_hash(argv):
+    """Return the peep hash of one or more files, returning a shell status code
+    or raising a PipException.
 
+    :arg argv: The commandline args, starting after the subcommand
+
+    """
+    parser = OptionParser(
+        usage='usage: %prog hash file [file ...]',
+        description='Print a peep hash line for one or more files: for '
+                    'example, "# sha256: '
+                    'oz42dZy6Gowxw8AelDtO4gRgTW_xPdooH484k7I5EOY".')
+    _, paths = parser.parse_args(args=argv)
+    if paths:
+        for path in paths:
+            print '# sha256:', hash_of_file(path)
+        return ITS_FINE_ITS_FINE
+    else:
+        parser.print_usage()
+        return COMMAND_LINE_ERROR
+
+
+def peep_install(argv):
+    """Perform the ``peep install`` subcommand, returning a shell status code
+    or raising a PipException.
+
+    :arg argv: The commandline args, starting after the subcommand
+
+    """
+    req_paths = list(requirement_args(argv, want_paths=True))
+    if not req_paths:
+        print "You have to specify one or more requirements files with the -r option, because otherwise there's nowhere for peep to look up the hashes."
+        return COMMAND_LINE_ERROR
+
+    # We're a "peep install" command, and we have some requirement paths.
+
+    requirements = list(chain(*(parse_requirements(path) for
+                                path in req_paths)))
+    downloaded_hashes, downloaded_versions = {}, {}
+    with ephemeral_dir() as temp_path:
+        for req in requirements:
+            name = req.req.project_name
+            archive_filename = pip_download(req, argv, temp_path)
+            downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
+            downloaded_versions[name] = version_of_archive(archive_filename, name)
+
+        expected_hashes, missing_hashes = hashes_of_requirements(requirements)
+        mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
+
+        # Skip a line after pip's "Cleaning up..." so the important stuff
+        # stands out:
+        if mismatches or missing_hashes:
+            print
+
+        # Mismatched hashes:
+        if mismatches:
+            print "THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE REQUIREMENTS FILE. If you have updated the package versions, update the hashes. If not, freak out, because someone has tampered with the packages.\n"
+        for expected_hashes, package_name, hash_of_download in mismatches:
+            hash_of_download = downloaded_hashes[package_name]
+            preamble = '    %s: expected%s' % (
+                    package_name,
+                    ' one of' if len(expected_hashes) > 1 else '')
+            print preamble,
+            print ('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes)
+            print ' ' * (len(preamble) - 4), 'got', hash_of_download
+        if mismatches:
+            print  # Skip a line before "Not proceeding..."
+
+        # Missing hashes:
+        if missing_hashes:
+            print 'The following packages had no hashes specified in the requirements file, which leaves them open to tampering. Vet these packages to your satisfaction, then add these "sha256" lines like so:\n'
+        for package_name in missing_hashes:
+            print '# sha256: %s' % downloaded_hashes[package_name]
+            print '%s==%s\n' % (package_name,
+                                downloaded_versions[package_name])
+
+        if mismatches or missing_hashes:
+            print '-------------------------------'
+            print 'Not proceeding to installation.'
+            return SOMETHING_WENT_WRONG
+        else:
+            pip_install_archives_from(temp_path)
+    return ITS_FINE_ITS_FINE
+
+
+def main():
+    """Be the top-level entrypoint. Return a shell status code."""
+    commands = {'hash': peep_hash,
+                'install': peep_install}
     try:
-        if not (len(argv) >= 2 and argv[1] == 'install'):
+        if len(argv) >= 2 and argv[1] in commands:
+            return commands[argv[1]](argv[2:])
+        else:
             # Fall through to top-level pip main() for everything else:
             return pip.main()
-
-        req_paths = list(requirement_args(argv[1:], want_paths=True))
-        if not req_paths:
-            print "You have to specify one or more requirements files with the -r option, because otherwise there's nowhere for peep to look up the hashes."
-            return COMMAND_LINE_ERROR
-
-        # We're a "peep install" command, and we have some requirement paths.
-
-        requirements = list(chain(*(parse_requirements(path) for
-                                    path in req_paths)))
-        downloaded_hashes, downloaded_versions = {}, {}
-        with ephemeral_dir() as temp_path:
-            for req in requirements:
-                name = req.req.project_name
-                archive_filename = pip_download(req, argv, temp_path)
-                downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
-                downloaded_versions[name] = version_of_archive(archive_filename, name)
-
-            expected_hashes, missing_hashes = hashes_of_requirements(requirements)
-            mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
-
-            # Skip a line after pip's "Cleaning up..." so the important stuff
-            # stands out:
-            if mismatches or missing_hashes:
-                print
-
-            # Mismatched hashes:
-            if mismatches:
-                print "THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE REQUIREMENTS FILE. If you have updated the package versions, update the hashes. If not, freak out, because someone has tampered with the packages.\n"
-            for expected_hashes, package_name, hash_of_download in mismatches:
-                hash_of_download = downloaded_hashes[package_name]
-                preamble = '    %s: expected%s' % (
-                        package_name,
-                        ' one of' if len(expected_hashes) > 1 else '')
-                print preamble,
-                print ('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes)
-                print ' ' * (len(preamble) - 4), 'got', hash_of_download
-            if mismatches:
-                print  # Skip a line before "Not proceeding..."
-
-            # Missing hashes:
-            if missing_hashes:
-                print 'The following packages had no hashes specified in the requirements file, which leaves them open to tampering. Vet these packages to your satisfaction, then add these "sha256" lines like so:\n'
-            for package_name in missing_hashes:
-                print '# sha256: %s' % downloaded_hashes[package_name]
-                print '%s==%s\n' % (package_name,
-                                    downloaded_versions[package_name])
-
-            if mismatches or missing_hashes:
-                print '-------------------------------'
-                print 'Not proceeding to installation.'
-                return SOMETHING_WENT_WRONG
-            else:
-                pip_install_archives_from(temp_path)
     except PipException as exc:
         return exc.error_code
-    return ITS_FINE_ITS_FINE

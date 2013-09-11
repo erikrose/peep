@@ -89,6 +89,12 @@ Other Niceties
   a big ``$PIP=/path/to/pip`` at the top.
 * ``peep``-compatible requirements files remain entirely usable with ``pip``,
   because the hashes are just comments, after all.
+* Have a manually downloaded package you've vetted? Run ``peep hash`` on its
+  tarball (the original, from PyPI--be sure to keep it around) to get its hash
+  line::
+
+    % peep hash nose-1.3.0.tar.gz
+    # sha256: TmPMMyXedc-Y_61AvnL6aXU96CRpUXMXj3TANP5PUmA
 
 
 Troubleshooting
@@ -120,6 +126,9 @@ is the bug to watch.
 
 Version History
 ===============
+
+0.6
+  * Add ``peep hash`` subcommand.
 
 0.5
   * Allow multiple acceptable hashes for a package. This works around PyPI's
