@@ -117,6 +117,17 @@ block of commented lines::
     # sha256: 6QTt-5DahBKcBiUs06BfkLTuvBu1uF7pblb_bPaUONU
     mock==0.8.0
 
+If you don't want to wait until you're bitten by this surprise, use the ``peep
+hash`` command to find hashes of each equivalent archive for a package. I like
+to vet one of them (say, the tarball), then download the other and use a file
+comparison tool to verify that they have identical contents. Then I run ``peep
+hash`` over both original archives, like so, and add the result to my
+``requirements.txt``::
+
+    % peep hash mock-0.8.0.tar.gz mock-0.8.0.zip
+    # sha256: lvpN706AIAvoJ8P1EUfdez-ohzuSB-MyXUe6Rb8ppcE
+    # sha256: 6QTt-5DahBKcBiUs06BfkLTuvBu1uF7pblb_bPaUONU
+
 A future version of peep will emit all the applicable hashes as suggestions, to
 save you the effort of manually identifying such packages. Or, more likely, we
 will simply correct PyPI's capriciousness in a future version of it.
