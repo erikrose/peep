@@ -22,6 +22,26 @@ from shutil import rmtree
 from sys import argv, exit
 from tempfile import mkdtemp
 
+from pkg_resources import require, VersionConflict, DistributionNotFound
+
+# We don't admit our dependency on pip in setup.py, lest a naive user simply
+# say `pip install peep.tar.gz` and thus pull down an untrusted copy of pip
+# from PyPI. Instead, we make sure it's installed and new enough here and spit
+# out an error message if not:
+def activate(specifier):
+    """Make a compatible version of pip importable. Raise a RuntimeError if we
+    couldn't."""
+    try:
+        for distro in require(specifier):
+            distro.activate()
+    except (VersionConflict, DistributionNotFound):
+        raise RuntimeError('The installed version of pip is too old; peep '
+                           'requires ' + specifier)
+
+activate('pip>=0.6.2')  # Before 0.6.2, the log module wasn't there, so some
+                         # of our monkeypatching fails. It probably wouldn't be
+                         # much work to support even earlier, though.
+
 import pip
 from pip.log import logger
 from pip.req import parse_requirements
@@ -237,6 +257,17 @@ def peep_hash(argv):
         return COMMAND_LINE_ERROR
 
 
+class EmptyOptions(object):
+    """Fake optparse options for compatibility with pip<1.2
+
+    pip<1.2 had a bug in parse_requirments() in which the ``options`` kwarg
+    was required. We work around that by passing it a mock object.
+
+    """
+    default_vcs = None
+    skip_requirements_regex = None
+
+
 def peep_install(argv):
     """Perform the ``peep install`` subcommand, returning a shell status code
     or raising a PipException.
@@ -250,9 +281,9 @@ def peep_install(argv):
         return COMMAND_LINE_ERROR
 
     # We're a "peep install" command, and we have some requirement paths.
-
-    requirements = list(chain(*(parse_requirements(path) for
-                                path in req_paths)))
+    requirements = list(chain(*(parse_requirements(path,
+                                                   options=EmptyOptions())
+                                for path in req_paths)))
     downloaded_hashes, downloaded_versions = {}, {}
     with ephemeral_dir() as temp_path:
         for req in requirements:

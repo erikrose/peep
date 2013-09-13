@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='peep',
-    version='0.6',
+    version='0.7',
     description='A "pip install" that is cryptographically guaranteed repeatable',
     long_description=open('README.rst').read(),
     author='Erik Rose',
@@ -17,7 +17,8 @@ setup(
         },
     url='https://github.com/erikrose/peep',
     include_package_data=True,
-    install_requires=['pip>=1.2'],
+    # No dependencies are declared for peep, even though it requires pip.
+    # install_requires=['pip>=0.6.2'],
     classifiers=[
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',

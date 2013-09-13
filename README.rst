@@ -138,6 +138,20 @@ is the bug to watch.
 Version History
 ===============
 
+0.7
+  Make some practical tweaks for projects which bootstrap their trust chains by
+  checking a tarball of peep into their source trees.
+
+  * Start supporting versions of pip back to 0.6.2 (released in January 2010).
+    This way, you can deploy trustworthily on old versions of RHEL just by
+    checking a tarball of peep into your source tree and pip-installing it; you
+    don't have to check in pip itself or go to the bother of unpacking the peep
+    tarball and running ``python setup.py install`` from your deploy script.
+  * Remove the explicit dependency on pip. This is so a blithe call to
+    ``pip install peep.tar.gz`` without ``--no-deps`` doesn't go out and pull
+    an untrusted package from PyPI. Instead, we scream at runtime if pip is
+    absent or too old. Fail safe.
+
 0.6
   * Add ``peep hash`` subcommand.
   * Require pip>=1.2, as lower versions have a bug that causes a crash on
