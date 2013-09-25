@@ -95,6 +95,12 @@ Other Niceties
 
     % peep hash nose-1.3.0.tar.gz
     # sha256: TmPMMyXedc-Y_61AvnL6aXU96CRpUXMXj3TANP5PUmA
+* If a package is already present--which might be the case if you're installing
+  into a non-empty virtualenv--``peep`` doesn't bother downloading or building it
+  again. It assumes you installed it with ``peep`` in a previous invocation and
+  thus trusts it. Re-using a virtualenv during deployment can really speed
+  things up, but it does leave open the question of how to remove dependencies
+  which are no longer needed.
 
 
 Troubleshooting
@@ -104,11 +110,13 @@ Are you suddenly getting the Fearsome Warning? Maybe you're really in trouble,
 but maybe something more innocuous is happening.
 
 A few packages offer downloads in multiple formats: for example, zips and
-tarballs. PyPI is currently unpredictable as to which it offers first, and pip
-simply takes the first one offered. Thus, some packages have more than one
-valid hash for a given version. To allow for these, you can stack up multiple
-known-good hashes above a requirement, as long as they are within a contiguous
-block of commented lines::
+tarballs. PyPI used to be unpredictable as to which it offered first, and pip
+simply takes the first one offered. Thus, if you're running an old version of
+PyPI internally or have some other Cheeseshop implementation which lacks a
+stable sort order, some packages may effectively have more than one valid hash
+for a given version. To allow for these, you can stack up multiple known-good
+hashes above a requirement, as long as they are within a contiguous block of
+commented lines::
 
     # Tarball:
     # sha256: lvpN706AIAvoJ8P1EUfdez-ohzuSB-MyXUe6Rb8ppcE
@@ -128,15 +136,16 @@ hash`` over both original archives, like so, and add the result to my
     # sha256: lvpN706AIAvoJ8P1EUfdez-ohzuSB-MyXUe6Rb8ppcE
     # sha256: 6QTt-5DahBKcBiUs06BfkLTuvBu1uF7pblb_bPaUONU
 
-A future version of peep will emit all the applicable hashes as suggestions, to
-save you the effort of manually identifying such packages. Or, more likely, we
-will simply correct PyPI's capriciousness in a future version of it.
-https://bitbucket.org/pypa/pypi/issue/64/order-of-archives-on-index-page-is-not
-is the bug to watch.
-
 
 Version History
 ===============
+
+0.8
+  * Support installing into non-empty virtualenvs, for speed. We do this by
+    trusting any already-installed package which satisfies a requirement. This
+    means you no longer have to rebuild ``lxml``, for instance, each time you
+    deploy.
+  * Wrap text output to 80 columns for nicer word wrap.
 
 0.7
   Make some practical tweaks for projects which bootstrap their trust chains by

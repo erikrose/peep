@@ -228,11 +228,20 @@ def hashes_of_requirements(requirements):
 def hash_mismatches(expected_hash_map, downloaded_hashes):
     """Yield the list of allowed hashes, package name, and download-hash of
     each package whose download-hash didn't match one allowed for it in the
-    requirements file."""
+    requirements file.
+
+    If a package is missing from ``download_hashes``, ignore it; that means
+    it's already installed and we're not risking anything.
+
+    """
     for package_name, expected_hashes in expected_hash_map.iteritems():
-        hash_of_download = downloaded_hashes[package_name]
-        if hash_of_download not in expected_hashes:
-            yield expected_hashes, package_name, hash_of_download
+        try:
+            hash_of_download = downloaded_hashes[package_name]
+        except KeyError:
+            pass
+        else:
+            if hash_of_download not in expected_hashes:
+                yield expected_hashes, package_name, hash_of_download
 
 
 def peep_hash(argv):
@@ -285,13 +294,17 @@ def peep_install(argv):
     requirements = list(chain(*(parse_requirements(path,
                                                    options=EmptyOptions())
                                 for path in req_paths)))
-    downloaded_hashes, downloaded_versions = {}, {}
+    downloaded_hashes, downloaded_versions, satisfied_reqs = {}, {}, []
     with ephemeral_dir() as temp_path:
         for req in requirements:
-            name = req.req.project_name
-            archive_filename = pip_download(req, argv, temp_path)
-            downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
-            downloaded_versions[name] = version_of_archive(archive_filename, name)
+            req.check_if_exists()
+            if req.satisfied_by:  # This is already installed.
+                satisfied_reqs.append(req)
+            else:
+                name = req.req.project_name
+                archive_filename = pip_download(req, argv, temp_path)
+                downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
+                downloaded_versions[name] = version_of_archive(archive_filename, name)
 
         expected_hashes, missing_hashes = hashes_of_requirements(requirements)
         mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
@@ -333,6 +346,14 @@ def peep_install(argv):
             return SOMETHING_WENT_WRONG
         else:
             pip_install_archives_from(temp_path)
+
+            if satisfied_reqs:
+                print "These packages were already installed, so we didn't need to download or build"
+                print "them again. If you installed them with peep in the first place, you should be"
+                print "safe. If not, uninstall them, then re-attempt your install with peep."
+                for req in satisfied_reqs:
+                    print '   ', req.req
+
     return ITS_FINE_ITS_FINE
 
 
