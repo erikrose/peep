@@ -277,7 +277,8 @@ def peep_install(argv):
     """
     req_paths = list(requirement_args(argv, want_paths=True))
     if not req_paths:
-        print "You have to specify one or more requirements files with the -r option, because otherwise there's nowhere for peep to look up the hashes."
+        print "You have to specify one or more requirements files with the -r option, because"
+        print "otherwise there's nowhere for peep to look up the hashes."
         return COMMAND_LINE_ERROR
 
     # We're a "peep install" command, and we have some requirement paths.
@@ -302,7 +303,9 @@ def peep_install(argv):
 
         # Mismatched hashes:
         if mismatches:
-            print "THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE REQUIREMENTS FILE. If you have updated the package versions, update the hashes. If not, freak out, because someone has tampered with the packages.\n"
+            print "THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE REQUIREMENTS"
+            print "FILE. If you have updated the package versions, update the hashes. If not,"
+            print "freak out, because someone has tampered with the packages.\n"
         for expected_hashes, package_name, hash_of_download in mismatches:
             hash_of_download = downloaded_hashes[package_name]
             preamble = '    %s: expected%s' % (
@@ -316,7 +319,9 @@ def peep_install(argv):
 
         # Missing hashes:
         if missing_hashes:
-            print 'The following packages had no hashes specified in the requirements file, which leaves them open to tampering. Vet these packages to your satisfaction, then add these "sha256" lines like so:\n'
+            print 'The following packages had no hashes specified in the requirements file, which'
+            print 'leaves them open to tampering. Vet these packages to your satisfaction, then'
+            print 'add these "sha256" lines like so:\n'
         for package_name in missing_hashes:
             print '# sha256: %s' % downloaded_hashes[package_name]
             print '%s==%s\n' % (package_name,
