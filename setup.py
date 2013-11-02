@@ -13,7 +13,7 @@ setup(
     license='MIT',
     packages=find_packages(exclude=['ez_setup']),
     entry_points={
-        'console_scripts': ['peep = peep:main']
+        'console_scripts': ['peep = peep.peep:main']
         },
     url='https://github.com/erikrose/peep',
     include_package_data=True,
