@@ -369,3 +369,6 @@ def main():
             return pip.main()
     except PipException as exc:
         return exc.error_code
+
+if __name__ == '__main__':
+    exit(main())
