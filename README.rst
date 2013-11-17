@@ -140,6 +140,10 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+0.9
+  * Put the operative parts of peep into a single module rather than a package,
+    and make it directly executable.
+
 0.8
   * Support installing into non-empty virtualenvs, for speed. We do this by
     trusting any already-installed package which satisfies a requirement. This

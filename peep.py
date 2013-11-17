@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """peep ("prudently examine every package") verifies that packages conform to a
 trusted, locally stored hash and only then installs them::
 
