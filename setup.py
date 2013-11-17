@@ -5,13 +5,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='peep',
-    version='0.8',
+    version='0.9',
     description='A "pip install" that is cryptographically guaranteed repeatable',
     long_description=open('README.rst').read(),
     author='Erik Rose',
     author_email='grinch@grinchcentral.com',
     license='MIT',
-    packages=find_packages(exclude=['ez_setup']),
+    py_modules=['peep'],
     entry_points={
         'console_scripts': ['peep = peep:main']
         },
