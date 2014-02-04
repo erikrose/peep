@@ -48,6 +48,9 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
+__version__ = 0, 9, 0
+
+
 ITS_FINE_ITS_FINE = 0
 SOMETHING_WENT_WRONG = 1
 # "Traditional" for command-line errors according to optparse docs:
