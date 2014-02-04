@@ -40,8 +40,8 @@ def activate(specifier):
                            'requires ' + specifier)
 
 activate('pip>=0.6.2')  # Before 0.6.2, the log module wasn't there, so some
-                         # of our monkeypatching fails. It probably wouldn't be
-                         # much work to support even earlier, though.
+                        # of our monkeypatching fails. It probably wouldn't be
+                        # much work to support even earlier, though.
 
 import pip
 from pip.log import logger
@@ -107,7 +107,7 @@ def pip_download(req, argv, temp_path):
     # Get the original line out of the reqs file:
     line = getline(*requirements_path_and_line(req))
 
-    # Copy and strip off binary name. Remove any requirement file args.
+    # Remove any requirement file args.
     argv = (['install', '--no-deps', '--download', temp_path] +
             list(requirement_args(argv, want_other=True)) +  # other args
             shlex.split(line))  # ['nose==1.3.0']. split() removes trailing \n.
