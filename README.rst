@@ -103,6 +103,22 @@ Other Niceties
   which are no longer needed.
 
 
+Embedding
+=========
+
+Peep was designed for unsupervised continuous deployment scenarios. In such
+scenarios, manual ahead-of-time prepartion on the deployment machine is a
+liability: one more thing to go wrong. To relieve you of having to install (and
+upgrade) ``peep`` by hand on your server or build box, we've made ``peep``
+embeddable. You can copy the ``peep.py`` file directly into your project's
+source tree and call it from there in your deployment script. This also gives
+you an obvious starting point for your chain of trust: however you trust your
+source code is how you trust your copy of ``peep``, and ``peep`` verifies
+everything else via hashes. (Equivalent would be if your OS provided peep as a
+package--presumably you trust your OS packages already--but this is not yet
+common.)
+
+
 Troubleshooting
 ===============
 
@@ -142,7 +158,7 @@ Version History
 
 0.9
   * Put the operative parts of peep into a single module rather than a package,
-    and make it directly executable.
+    and make it directly executable. (Brian Warner)
 
 0.8
   * Support installing into non-empty virtualenvs, for speed. We do this by
