@@ -156,6 +156,10 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+0.9.1
+  * Don't crash when trying to report a missing hash on a package that's
+    already installed.
+
 0.9
   * Put the operative parts of peep into a single module rather than a package,
     and make it directly executable. (Brian Warner)

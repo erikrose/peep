@@ -48,7 +48,7 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
-__version__ = 0, 9, 0
+__version__ = 0, 9, 1
 
 
 ITS_FINE_ITS_FINE = 0
@@ -312,6 +312,10 @@ def peep_install(argv):
 
         expected_hashes, missing_hashes = hashes_of_requirements(requirements)
         mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
+
+        # Remove satisfied_reqs from missing_hashes, preserving order:
+        satisfied_req_names = set(req.name for req in satisfied_reqs)
+        missing_hashes = [m for m in missing_hashes if m not in satisfied_req_names]
 
         # Skip a line after pip's "Cleaning up..." so the important stuff
         # stands out:
