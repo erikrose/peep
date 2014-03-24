@@ -12,7 +12,7 @@ uploading packages as you vetted them--or else check everything into a vendor
 library, necessitating a lot of fooling around with your VCS (or maintaining
 custom tooling) to do upgrades.
 
-Peep fixes all that.
+Peep fixes much of that.
 
 Vet your packages, put hashes of the PyPI-sourced tarballs into
 ``requirements.txt``, use ``peep install`` instead of ``pip install``, and let
@@ -20,6 +20,28 @@ the crypto do the rest. If a downloaded package doesn't match the hash,
 ``peep`` will freak out, and installation will go no further. No servers to
 maintain, no enormous vendor libs to wrestle. Just ``requirements.txt`` with
 some funny-looking comments and peace of mind.
+
+
+Quick FAQ
+=========
+
+1. Peep guarantees repeatability.
+
+   If you peep install package x version y, every subsequent install of package
+   x version y will be the same as the original or Peep will complain.
+
+2. Peep does not vet your packages.
+
+   Peep is not a substitute for vetting your packages. If you don't vet them,
+   then they are not vetted.
+
+3. Peep does not alleviate trust problems with authors or package indexes.
+
+   All peep does is guarantee that subsequent downloads of package x version y
+   are the same as the first one you did. It doesn't guarantee the author of
+   that package is trustworthy. It doesn't guarantee that the author of that
+   package released that package. It doesn't guarantee that the package index
+   is trustworthy.
 
 
 Switching to Peep
