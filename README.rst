@@ -27,8 +27,8 @@ Quick FAQ
 
 1. Peep guarantees repeatability.
 
-   If you peep install package x version y, every subsequent install of package
-   x version y will be the same as the original or Peep will complain.
+   If you ``peep install`` package x version y, every subsequent install of package
+   x version y will be the same as the original, or Peep will complain.
 
 2. Peep does not vet your packages.
 
