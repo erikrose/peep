@@ -178,6 +178,10 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+1.0
+  * Add wheel support. Peep will now work fine when pip decides to download a
+    wheel file.
+
 0.9.1
   * Don't crash when trying to report a missing hash on a package that's
     already installed.
