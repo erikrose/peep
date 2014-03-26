@@ -180,7 +180,7 @@ Version History
 
 1.0
   * Add wheel support. Peep will now work fine when pip decides to download a
-    wheel file.
+    wheel file. (Paul McLanahan)
 
 0.9.1
   * Don't crash when trying to report a missing hash on a package that's
