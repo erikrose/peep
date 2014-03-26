@@ -160,8 +160,8 @@ def version_of_archive(filename, package_name):
     # we know the format bits are '-' separated.
     if filename.endswith('.whl'):
         whl_package_name, version, _rest = filename.split('-', 2)
-        # do the alteration to package_name from PEP 427
-        our_package_name = re.sub("[^\w\d.]+", "_", package_name, re.UNICODE)
+        # Do the alteration to package_name from PEP 427:
+        our_package_name = re.sub(r'[^\w\d.]+', '_', package_name, re.UNICODE)
         if whl_package_name != our_package_name:
             raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
                                (filename, whl_package_name))
