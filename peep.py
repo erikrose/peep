@@ -172,7 +172,7 @@ def version_of_archive(filename, package_name):
         if filename.endswith(ext):
             filename = filename[:-len(ext)]
             break
-    if not filename.startswith(package_name):
+    if not filename.replace('_', '-').startswith(package_name):
         # TODO: What about safe/unsafe names?
         raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
                            (filename, package_name))
