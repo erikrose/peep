@@ -91,7 +91,7 @@ The Fearsome Warning
 If, during installation, a hash doesn't match, ``peep`` will say something like
 this::
 
-    THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE
+    THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE
     REQUIREMENTS FILE. If you have updated the package versions, update the
     hashes. If not, freak out, because someone has tampered with the packages.
 

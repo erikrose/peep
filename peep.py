@@ -336,7 +336,7 @@ def peep_install(argv):
 
         # Mismatched hashes:
         if mismatches:
-            print "THE FOLLOWING PACKAGES DIDN'T MATCHES THE HASHES SPECIFIED IN THE REQUIREMENTS"
+            print "THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE REQUIREMENTS"
             print "FILE. If you have updated the package versions, update the hashes. If not,"
             print "freak out, because someone has tampered with the packages.\n"
         for expected_hashes, package_name, hash_of_download in mismatches:
