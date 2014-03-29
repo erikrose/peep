@@ -152,31 +152,42 @@ def hash_of_file(path):
     return encoded_hash(sha)
 
 
-def version_of_archive(filename, package_name):
-    """Deduce the version number of a downloaded package from its filename."""
-    # Since we know the project_name, we can strip that off the left, strip any
-    # archive extensions off the right, and take the rest as the version.
-    # And for Wheel files (http://legacy.python.org/dev/peps/pep-0427/#file-name-convention)
-    # we know the format bits are '-' separated.
-    if filename.endswith('.whl'):
+def version_of_download(filename, package_name):
+    """Deduce the version number of a downloaded package from its filename.
+    
+    :arg project_name: The ``unsafe_name`` of the requirement
+    
+    """
+    def version_of_archive(filename, package_name):
+        # Since we know the project_name, we can strip that off the left, strip
+        # any archive extensions off the right, and take the rest as the
+        # version.
+        extensions = ['.tar.gz', '.tgz', '.tar', '.zip']
+        for ext in extensions:
+            if filename.endswith(ext):
+                filename = filename[:-len(ext)]
+                break
+        if not filename.startswith(package_name):
+            # TODO: What about safe/unsafe names?
+            give_up(filename, package_name)
+        return filename[len(package_name) + 1:]  # Strip off '-' before version.
+
+    def version_of_wheel(filename, package_name):
+        # For Wheel files (http://legacy.python.org/dev/peps/pep-0427/#file-
+        # name-convention) we know the format bits are '-' separated.
         whl_package_name, version, _rest = filename.split('-', 2)
         # Do the alteration to package_name from PEP 427:
         our_package_name = re.sub(r'[^\w\d.]+', '_', package_name, re.UNICODE)
         if whl_package_name != our_package_name:
-            raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
-                               (filename, whl_package_name))
+            give_up(filename, whl_package_name)
         return version
 
-    extensions = ['.tar.gz', '.tgz', '.tar', '.zip']
-    for ext in extensions:
-        if filename.endswith(ext):
-            filename = filename[:-len(ext)]
-            break
-    if not filename.startswith(package_name):
-        # TODO: What about safe/unsafe names?
-        raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
-                           (filename, package_name))
-    return filename[len(package_name) + 1:]  # Strip off '-' before version.
+    def give_up(filename, package_name):
+            raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
+                               (filename, package_name))
+
+    return (version_of_wheel if filename.endswith('.whl')
+            else version_of_archive)(filename, package_name)
 
 
 def requirement_args(argv, want_paths=False, want_other=False):
@@ -317,10 +328,10 @@ def peep_install(argv):
             if req.satisfied_by:  # This is already installed.
                 satisfied_reqs.append(req)
             else:
-                name = req.req.project_name
+                name = req.req.project_name  # unsafe name
                 archive_filename = pip_download(req, argv, temp_path)
                 downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
-                downloaded_versions[name] = version_of_archive(archive_filename, name)
+                downloaded_versions[name] = version_of_download(archive_filename, name)
 
         expected_hashes, missing_hashes = hashes_of_requirements(requirements)
         mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
