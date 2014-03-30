@@ -48,7 +48,7 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
-__version__ = 1, 0, 0
+__version__ = 1, 0, 1
 
 
 ITS_FINE_ITS_FINE = 0
@@ -167,8 +167,8 @@ def version_of_download(filename, package_name):
             if filename.endswith(ext):
                 filename = filename[:-len(ext)]
                 break
-        if not filename.startswith(package_name):
-            # TODO: What about safe/unsafe names?
+        if not filename.replace('_', '-').startswith(package_name):
+            # TODO: Should we replace runs of [^a-zA-Z0-9.], not just _, with -?
             give_up(filename, package_name)
         return filename[len(package_name) + 1:]  # Strip off '-' before version.
 

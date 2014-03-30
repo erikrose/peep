@@ -178,6 +178,10 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+1.0.1
+  * Fix error (which failed safe) on packages whose distro names contain
+    underscores. (Chris Ladd)
+
 1.0
   * Add wheel support. Peep will now work fine when pip decides to download a
     wheel file. (Paul McLanahan)
