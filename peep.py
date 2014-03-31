@@ -162,7 +162,7 @@ def version_of_download(filename, package_name):
         # Since we know the project_name, we can strip that off the left, strip
         # any archive extensions off the right, and take the rest as the
         # version.
-        extensions = ['.tar.gz', '.tgz', '.tar', '.zip']
+        extensions = ['.tar.bz2', '.tar.gz', '.tgz', '.tar', '.zip']
         for ext in extensions:
             if filename.endswith(ext):
                 filename = filename[:-len(ext)]
