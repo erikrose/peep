@@ -154,9 +154,9 @@ def hash_of_file(path):
 
 def version_of_download(filename, package_name):
     """Deduce the version number of a downloaded package from its filename.
-    
+
     :arg project_name: The ``unsafe_name`` of the requirement
-    
+
     """
     def version_of_archive(filename, package_name):
         # Since we know the project_name, we can strip that off the left, strip

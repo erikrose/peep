@@ -179,8 +179,8 @@ Version History
 ===============
 
 1.0.1
-  * Fix error (which failed safe) on packages whose distro names contain
-    underscores. (Chris Ladd)
+  * Fix error (which failed safe) installing packages whose distro names
+    contain underscores. (Chris Ladd)
 
 1.0
   * Add wheel support. Peep will now work fine when pip decides to download a
