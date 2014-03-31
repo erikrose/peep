@@ -147,14 +147,28 @@ Troubleshooting
 Are you suddenly getting the Fearsome Warning? Maybe you're really in trouble,
 but maybe something more innocuous is happening.
 
+Architecture-Specific Packages
+------------------------------
+
+If your packages install from wheels or other potentially architecture-specific
+sources, their hashes will obviously differ across platforms. If you deploy on
+more than one, you'll need more than one hash.
+
+Old PyPI Roulette
+-----------------
+
 A few packages offer downloads in multiple formats: for example, zips and
 tarballs. PyPI used to be unpredictable as to which it offered first, and pip
 simply takes the first one offered. Thus, if you're running an old version of
 PyPI internally or have some other Cheeseshop implementation which lacks a
 stable sort order, some packages may effectively have more than one valid hash
-for a given version. To allow for these, you can stack up multiple known-good
-hashes above a requirement, as long as they are within a contiguous block of
-commented lines::
+for a given version.
+
+How To Specify Multiple Hashes
+------------------------------
+
+To support these scenarios, you can stack up multiple known-good hashes above a
+requirement, as long as they are within a contiguous block of commented lines::
 
     # Tarball:
     # sha256: lvpN706AIAvoJ8P1EUfdez-ohzuSB-MyXUe6Rb8ppcE
