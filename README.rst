@@ -192,6 +192,9 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+1.0.2
+  * Add support for .tar.bz2 archives. (Paul McLanahan)
+
 1.0.1
   * Fix error (which failed safe) installing packages whose distro names
     contain underscores. (Chris Ladd)

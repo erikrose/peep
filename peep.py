@@ -48,7 +48,7 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
-__version__ = 1, 0, 1
+__version__ = 1, 0, 2
 
 
 ITS_FINE_ITS_FINE = 0
