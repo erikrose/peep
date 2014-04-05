@@ -9,6 +9,7 @@ local PyPI mirror or use a vendor lib. Just update the version numbers and
 hashes in requirements.txt, and you're all set.
 
 """
+from __future__ import print_function
 from base64 import urlsafe_b64encode
 from contextlib import contextmanager
 from hashlib import sha256
@@ -72,7 +73,7 @@ def encoded_hash(sha):
     downloaded archive before unpacking.
 
     """
-    return urlsafe_b64encode(sha.digest()).rstrip('=')
+    return str(urlsafe_b64encode(sha.digest()).decode('ascii')).rstrip('=')
 
 
 @contextmanager
@@ -142,7 +143,7 @@ def pip_install_archives_from(temp_path):
 
 def hash_of_file(path):
     """Return the hash of a downloaded file."""
-    with open(path, 'r') as archive:
+    with open(path, 'rb') as archive:
         sha = sha256()
         while True:
             data = archive.read(2 ** 20)
@@ -228,7 +229,7 @@ def hashes_of_requirements(requirements):
     def hashes_above(path, line_number):
         """Yield hashes from contiguous comment lines before line
         ``line_number``."""
-        for line_number in xrange(line_number - 1, 0, -1):
+        for line_number in range(line_number - 1, 0, -1):
             # If we hit a non-comment line, abort:
             line = getline(path, line_number)
             if not line.startswith('#'):
@@ -261,7 +262,7 @@ def hash_mismatches(expected_hash_map, downloaded_hashes):
     it's already installed and we're not risking anything.
 
     """
-    for package_name, expected_hashes in expected_hash_map.iteritems():
+    for package_name, expected_hashes in expected_hash_map.items():
         try:
             hash_of_download = downloaded_hashes[package_name]
         except KeyError:
@@ -286,7 +287,7 @@ def peep_hash(argv):
     _, paths = parser.parse_args(args=argv)
     if paths:
         for path in paths:
-            print '# sha256:', hash_of_file(path)
+            print('# sha256:', hash_of_file(path))
         return ITS_FINE_ITS_FINE
     else:
         parser.print_usage()
@@ -313,8 +314,8 @@ def peep_install(argv):
     """
     req_paths = list(requirement_args(argv, want_paths=True))
     if not req_paths:
-        print "You have to specify one or more requirements files with the -r option, because"
-        print "otherwise there's nowhere for peep to look up the hashes."
+        print("You have to specify one or more requirements files with the -r option, because")
+        print("otherwise there's nowhere for peep to look up the hashes.")
         return COMMAND_LINE_ERROR
 
     # We're a "peep install" command, and we have some requirement paths.
@@ -343,47 +344,47 @@ def peep_install(argv):
         # Skip a line after pip's "Cleaning up..." so the important stuff
         # stands out:
         if mismatches or missing_hashes:
-            print
+            print()
 
         # Mismatched hashes:
         if mismatches:
-            print "THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE REQUIREMENTS"
-            print "FILE. If you have updated the package versions, update the hashes. If not,"
-            print "freak out, because someone has tampered with the packages.\n"
+            print("THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE REQUIREMENTS")
+            print("FILE. If you have updated the package versions, update the hashes. If not,")
+            print("freak out, because someone has tampered with the packages.\n")
         for expected_hashes, package_name, hash_of_download in mismatches:
             hash_of_download = downloaded_hashes[package_name]
             preamble = '    %s: expected%s' % (
                     package_name,
                     ' one of' if len(expected_hashes) > 1 else '')
-            print preamble,
-            print ('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes)
-            print ' ' * (len(preamble) - 4), 'got', hash_of_download
+            print(preamble,)
+            print(('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes))
+            print(' ' * (len(preamble) - 4), 'got', hash_of_download)
         if mismatches:
-            print  # Skip a line before "Not proceeding..."
+            print()  # Skip a line before "Not proceeding..."
 
         # Missing hashes:
         if missing_hashes:
-            print 'The following packages had no hashes specified in the requirements file, which'
-            print 'leaves them open to tampering. Vet these packages to your satisfaction, then'
-            print 'add these "sha256" lines like so:\n'
+            print('The following packages had no hashes specified in the requirements file, which')
+            print('leaves them open to tampering. Vet these packages to your satisfaction, then')
+            print('add these "sha256" lines like so:\n')
         for package_name in missing_hashes:
-            print '# sha256: %s' % downloaded_hashes[package_name]
-            print '%s==%s\n' % (package_name,
-                                downloaded_versions[package_name])
+            print('# sha256: %s' % downloaded_hashes[package_name])
+            print('%s==%s\n' % (package_name,
+                                downloaded_versions[package_name]))
 
         if mismatches or missing_hashes:
-            print '-------------------------------'
-            print 'Not proceeding to installation.'
+            print('-------------------------------')
+            print('Not proceeding to installation.')
             return SOMETHING_WENT_WRONG
         else:
             pip_install_archives_from(temp_path)
 
             if satisfied_reqs:
-                print "These packages were already installed, so we didn't need to download or build"
-                print "them again. If you installed them with peep in the first place, you should be"
-                print "safe. If not, uninstall them, then re-attempt your install with peep."
+                print("These packages were already installed, so we didn't need to download or build")
+                print("them again. If you installed them with peep in the first place, you should be")
+                print("safe. If not, uninstall them, then re-attempt your install with peep.")
                 for req in satisfied_reqs:
-                    print '   ', req.req
+                    print('   ', req.req)
 
     return ITS_FINE_ITS_FINE
 
