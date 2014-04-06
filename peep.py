@@ -356,7 +356,7 @@ def peep_install(argv):
             preamble = '    %s: expected%s' % (
                     package_name,
                     ' one of' if len(expected_hashes) > 1 else '')
-            print(preamble,)
+            print(preamble, end=' ')
             print(('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes))
             print(' ' * (len(preamble) - 4), 'got', hash_of_download)
         if mismatches:
