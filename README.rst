@@ -12,7 +12,7 @@ uploading packages as you vetted them--or else check everything into a vendor
 library, necessitating a lot of fooling around with your VCS (or maintaining
 custom tooling) to do upgrades.
 
-Peep fixes much of that.
+Peep fixes all that.
 
 Vet your packages, put hashes of the PyPI-sourced tarballs into
 ``requirements.txt``, use ``peep install`` instead of ``pip install``, and let
