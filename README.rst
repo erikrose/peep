@@ -192,6 +192,9 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+1.1
+  * Support Python 3. (Keryn Knight)
+
 1.0.2
   * Add support for .tar.bz2 archives. (Paul McLanahan)
 
