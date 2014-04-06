@@ -73,7 +73,7 @@ def encoded_hash(sha):
     downloaded archive before unpacking.
 
     """
-    return str(urlsafe_b64encode(sha.digest()).decode('ascii')).rstrip('=')
+    return urlsafe_b64encode(sha.digest()).decode('ascii').rstrip('=')
 
 
 @contextmanager
