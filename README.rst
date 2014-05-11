@@ -75,6 +75,9 @@ Switching to Peep
     # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
     Pygments==1.4
 
+    # sha256: A1gwhyCNozcxug18_9RjJTmJQa1rctOt-AnP7_yR0PM
+    https://github.com/jsocol/commonware/archive/b5544185b2d24adc1eb512735990752400ce9cbd.zip#egg=commonware
+
     -------------------------------
     Not proceeding to installation.
 2. Vet the packages coming off PyPI in whatever way you typically do.

@@ -17,12 +17,13 @@ from itertools import chain
 from linecache import getline
 from optparse import OptionParser
 from os import listdir
-from os.path import join, basename
+from os.path import join, basename, splitext
 import re
 import shlex
 from shutil import rmtree
 from sys import argv, exit
 from tempfile import mkdtemp
+from urlparse import urlparse
 
 from pkg_resources import require, VersionConflict, DistributionNotFound
 
@@ -57,6 +58,7 @@ SOMETHING_WENT_WRONG = 1
 # "Traditional" for command-line errors according to optparse docs:
 COMMAND_LINE_ERROR = 2
 
+ARCHIVE_EXTENSIONS = ('.tar.bz2', '.tar.gz', '.tgz', '.tar', '.zip')
 
 class PipException(Exception):
     """When I delegated to pip, it exited with an error."""
@@ -153,6 +155,44 @@ def hash_of_file(path):
     return encoded_hash(sha)
 
 
+def is_git_sha(text):
+    """Returns True if this is probably a git sha"""
+    # Handle both the full sha as well as the 7-character abbrviation
+    if len(text) in (40, 7):
+        try:
+            int(text, 16)
+            return True
+        except ValueError:
+            pass
+    return False
+
+
+def filename_from_url(url):
+    parsed = urlparse(url)
+    path = parsed.path
+    return path.split('/')[-1]
+
+
+def is_always_unsatisfied(req):
+    """Returns whether this requirement is always unsatisfied
+
+    This would happen in cases where we can't determine the version
+    from the filename.
+
+    """
+    # If this is a github sha tarball, then it is always unsatisfied
+    # because the url has a commit sha in it and not the version
+    # number.
+    url = req.url
+    if url:
+        filename = filename_from_url(url)
+        if filename.endswith(ARCHIVE_EXTENSIONS):
+            filename, ext = splitext(filename)
+            if is_git_sha(filename):
+                return True
+    return False
+
+
 def version_of_download(filename, package_name):
     """Deduce the version number of a downloaded package from its filename.
 
@@ -163,11 +203,13 @@ def version_of_download(filename, package_name):
         # Since we know the project_name, we can strip that off the left, strip
         # any archive extensions off the right, and take the rest as the
         # version.
-        extensions = ['.tar.bz2', '.tar.gz', '.tgz', '.tar', '.zip']
-        for ext in extensions:
+        for ext in ARCHIVE_EXTENSIONS:
             if filename.endswith(ext):
                 filename = filename[:-len(ext)]
                 break
+        # Handle github sha tarball downloads.
+        if is_git_sha(filename):
+            filename = package_name + '-' + filename
         if not filename.replace('_', '-').startswith(package_name):
             # TODO: Should we replace runs of [^a-zA-Z0-9.], not just _, with -?
             give_up(filename, package_name)
@@ -240,7 +282,7 @@ def hashes_of_requirements(requirements):
                 yield line.split(':', 1)[1].strip()
 
     expected_hashes = {}
-    missing_hashes = []
+    missing_hashes_req = []
 
     for req in requirements:  # InstallRequirements
         path, line_number = requirements_path_and_line(req)
@@ -249,8 +291,8 @@ def hashes_of_requirements(requirements):
             hashes.reverse()  # because we read them backwards
             expected_hashes[req.name] = hashes
         else:
-            missing_hashes.append(req.name)
-    return expected_hashes, missing_hashes
+            missing_hashes_req.append(req)
+    return expected_hashes, missing_hashes_req
 
 
 def hash_mismatches(expected_hash_map, downloaded_hashes):
@@ -326,7 +368,10 @@ def peep_install(argv):
     with ephemeral_dir() as temp_path:
         for req in requirements:
             req.check_if_exists()
-            if req.satisfied_by:  # This is already installed.
+            if req.satisfied_by and not is_always_unsatisfied(req):
+                # This is already installed or we don't know the
+                # version number from the requirement line, so we can
+                # never know if this is satisfied.
                 satisfied_reqs.append(req)
             else:
                 name = req.req.project_name  # unsafe name
@@ -334,16 +379,16 @@ def peep_install(argv):
                 downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
                 downloaded_versions[name] = version_of_download(archive_filename, name)
 
-        expected_hashes, missing_hashes = hashes_of_requirements(requirements)
+        expected_hashes, missing_hashes_reqs = hashes_of_requirements(requirements)
         mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
 
         # Remove satisfied_reqs from missing_hashes, preserving order:
         satisfied_req_names = set(req.name for req in satisfied_reqs)
-        missing_hashes = [m for m in missing_hashes if m not in satisfied_req_names]
+        missing_hashes_reqs = [req for req in missing_hashes_reqs if req.name not in satisfied_req_names]
 
         # Skip a line after pip's "Cleaning up..." so the important stuff
         # stands out:
-        if mismatches or missing_hashes:
+        if mismatches or missing_hashes_reqs:
             print()
 
         # Mismatched hashes:
@@ -363,16 +408,21 @@ def peep_install(argv):
             print()  # Skip a line before "Not proceeding..."
 
         # Missing hashes:
-        if missing_hashes:
+        if missing_hashes_reqs:
             print('The following packages had no hashes specified in the requirements file, which')
             print('leaves them open to tampering. Vet these packages to your satisfaction, then')
             print('add these "sha256" lines like so:\n')
-        for package_name in missing_hashes:
-            print('# sha256: %s' % downloaded_hashes[package_name])
-            print('%s==%s\n' % (package_name,
-                                downloaded_versions[package_name]))
+        for req in missing_hashes_reqs:
+            print('# sha256: %s' % downloaded_hashes[req.name])
+            if req.url:
+                line = req.url
+                if req.name not in filename_from_url(req.url):
+                    line = '%s#egg=%s' % (line, req.name)
+            else:
+                line = '%s==%s' % (req.name, downloaded_versions[req.name])
+            print(line + '\n')
 
-        if mismatches or missing_hashes:
+        if mismatches or missing_hashes_reqs:
             print('-------------------------------')
             print('Not proceeding to installation.')
             return SOMETHING_WENT_WRONG
