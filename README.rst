@@ -157,7 +157,7 @@ If your packages install from wheels or other potentially architecture-specific
 sources, their hashes will obviously differ across platforms. If you deploy on
 more than one, you'll need more than one hash.
 
-Old PyPI Roulette
+Old-PyPI Roulette
 -----------------
 
 A few packages offer downloads in multiple formats: for example, zips and
@@ -194,6 +194,11 @@ hash`` over both original archives, like so, and add the result to my
 
 Version History
 ===============
+
+1.2
+  * Support GitHub-style tarballs (that is, ones whose filenames don't contain
+    the distro name or version and whose version numbers aren't reliable) in
+    requirements files. (Will Kahn-Greene)
 
 1.1
   * Support Python 3. (Keryn Knight)
