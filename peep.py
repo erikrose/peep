@@ -364,9 +364,14 @@ def peep_install(argv):
     requirements = list(chain(*(parse_requirements(path,
                                                    options=EmptyOptions())
                                 for path in req_paths)))
-    downloaded_hashes, downloaded_versions, satisfied_reqs = {}, {}, []
+    downloaded_hashes, downloaded_versions, satisfied_reqs, malformed_reqs = {}, {}, [], []
+
     with ephemeral_dir() as temp_path:
         for req in requirements:
+            if not req.req or not req.req.project_name:
+                malformed_reqs.append('Unable to determine package name from URL %s; add #egg=' % req.url)
+                continue
+
             req.check_if_exists()
             if req.satisfied_by and not is_always_unsatisfied(req):
                 # This is already installed or we don't know the
@@ -388,7 +393,7 @@ def peep_install(argv):
 
         # Skip a line after pip's "Cleaning up..." so the important stuff
         # stands out:
-        if mismatches or missing_hashes_reqs:
+        if mismatches or missing_hashes_reqs or malformed_reqs:
             print()
 
         # Mismatched hashes:
@@ -422,7 +427,11 @@ def peep_install(argv):
                 line = '%s==%s' % (req.name, downloaded_versions[req.name])
             print(line + '\n')
 
-        if mismatches or missing_hashes_reqs:
+        if malformed_reqs:
+            print('The following requirements could not be processed:')
+            print('*', '\n* '.join(malformed_reqs))
+
+        if mismatches or missing_hashes_reqs or malformed_reqs:
             print('-------------------------------')
             print('Not proceeding to installation.')
             return SOMETHING_WENT_WRONG

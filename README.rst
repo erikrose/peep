@@ -199,6 +199,7 @@ Version History
   * Support GitHub-style tarballs (that is, ones whose filenames don't contain
     the distro name or version and whose version numbers aren't reliable) in
     requirements files. (Will Kahn-Greene)
+  * Warn when a URL-based requirement lacks ``#egg=``. (Chris Adams)
 
 1.1
   * Support Python 3. (Keryn Knight)
