@@ -364,14 +364,12 @@ def peep_install(argv):
     requirements = list(chain(*(parse_requirements(path,
                                                    options=EmptyOptions())
                                 for path in req_paths)))
-    downloaded_hashes, downloaded_versions, satisfied_reqs = {}, {}, []
-
-    malformed_reqs = []
+    downloaded_hashes, downloaded_versions, satisfied_reqs, malformed_reqs = {}, {}, [], []
 
     with ephemeral_dir() as temp_path:
         for req in requirements:
             if not req.req or not req.req.project_name:
-                malformed_reqs.append('Unable to determine package name from URL %s: add #egg=' % req.url)
+                malformed_reqs.append('Unable to determine package name from URL %s; add #egg=' % req.url)
                 continue
 
             req.check_if_exists()
@@ -431,7 +429,7 @@ def peep_install(argv):
 
         if malformed_reqs:
             print('The following requirements could not be processed:')
-            print('*', '\n*'.join(malformed_reqs))
+            print('*', '\n* '.join(malformed_reqs))
 
         if mismatches or missing_hashes_reqs or malformed_reqs:
             print('-------------------------------')
