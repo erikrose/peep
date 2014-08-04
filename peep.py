@@ -132,15 +132,13 @@ def pip_download(req, argv, temp_path):
     return (set(listdir(temp_path)) - old_contents).pop()
 
 
-def pip_install_archives_from(temp_path):
+def pip_install_archives_from(temp_path, argv):
     """pip install the archives from the ``temp_path`` dir, omitting
     dependencies."""
-    # TODO: Make this preserve any pip options passed in, but strip off -r
-    # options and other things that don't make sense at this point in the
-    # process.
+    other_args = list(requirement_args(argv, want_other=True))
     for filename in listdir(temp_path):
         archive_path = join(temp_path, filename)
-        run_pip(['install', '--no-deps', archive_path])
+        run_pip(['install'] + other_args +  ['--no-deps', archive_path])
 
 
 def hash_of_file(path):
@@ -436,7 +434,7 @@ def peep_install(argv):
             print('Not proceeding to installation.')
             return SOMETHING_WENT_WRONG
         else:
-            pip_install_archives_from(temp_path)
+            pip_install_archives_from(temp_path, argv)
 
             if satisfied_reqs:
                 print("These packages were already installed, so we didn't need to download or build")
