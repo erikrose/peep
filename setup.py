@@ -13,7 +13,8 @@ setup(
     license='MIT',
     py_modules=['peep'],
     entry_points={
-        'console_scripts': ['peep = peep:main']
+        'console_scripts': ['peep = peep:main',
+                            'peep-%s.%s = peep:main' % sys.version_info[:2]]
         },
     url='https://github.com/erikrose/peep',
     include_package_data=True,

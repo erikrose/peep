@@ -200,6 +200,9 @@ Version History
     installs the downloaded archive. This means you can use things like
     ``--install-options`` fruitfully.
   * Add Python 3.4 support by correcting an import.
+  * Install a second peep script named after the active Python version, e.g.
+    peep-2.7. This is a convenience for those using multiple versions of
+    Python and not using virtualenvs.
 
 1.2
   * Support GitHub-style tarballs (that is, ones whose filenames don't contain
