@@ -53,7 +53,7 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
-__version__ = 1, 2, 0
+__version__ = 1, 3, 0
 
 
 ITS_FINE_ITS_FINE = 0
