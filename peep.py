@@ -23,7 +23,10 @@ import shlex
 from shutil import rmtree
 from sys import argv, exit
 from tempfile import mkdtemp
-from urlparse import urlparse
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse  # 3.4
 
 from pkg_resources import require, VersionConflict, DistributionNotFound
 

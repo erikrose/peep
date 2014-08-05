@@ -199,6 +199,7 @@ Version History
   * Pass through most args to the invocation of ``pip install`` that actually
     installs the downloaded archive. This means you can use things like
     ``--install-options`` fruitfully.
+  * Add Python 3.4 support by correcting an import.
 
 1.2
   * Support GitHub-style tarballs (that is, ones whose filenames don't contain
