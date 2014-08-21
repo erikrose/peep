@@ -211,7 +211,7 @@ def version_of_download(filename, package_name):
         # Handle github sha tarball downloads.
         if is_git_sha(filename):
             filename = package_name + '-' + filename
-        if not filename.replace('_', '-').startswith(package_name):
+        if not filename.lower().replace('_', '-').startswith(package_name.lower()):
             # TODO: Should we replace runs of [^a-zA-Z0-9.], not just _, with -?
             give_up(filename, package_name)
         return filename[len(package_name) + 1:]  # Strip off '-' before version.
