@@ -271,7 +271,7 @@ HASH_COMMENT_RE = re.compile(
     \s*\#\s*                    # Lines that start with a '#'
     (?P<hash_type>sha256):\s*   # Hash type is hardcoded to be sha256 for now.
     (?P<hash>[^\#\s]+)\s*       # Hashes can be anything except '#' or spaces.
-    (?:\#\s+(?P<comment>.*))?   # Comments can be anything after a #, and are
+    (?:\#\s*(?P<comment>.*))?   # Comments can be anything after a #, and are
     """, re.X)                  # optional.
 
 
