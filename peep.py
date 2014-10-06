@@ -282,10 +282,12 @@ def hashes_of_requirements(requirements):
         """Yield hashes from contiguous comment lines before line
         ``line_number``."""
         for line_number in range(line_number - 1, 0, -1):
-            match = HASH_COMMENT_RE.match(getline(path, line_number))
+            line = getline(path, line_number)
+            match = HASH_COMMENT_RE.match(line)
             if match:
                 yield match.groupdict()['hash']
-            else:
+            elif not line.startswith('#')
+                # If we hit a non-comment line, abort
                 break
 
     expected_hashes = {}
