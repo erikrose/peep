@@ -266,6 +266,15 @@ def requirements_path_and_line(req):
     return path, int(line)
 
 
+HASH_COMMENT_RE = re.compile(
+    r"""
+    \s*\#\s*                    # Lines that start with a '#'
+    (?P<hash_type>sha256):\s*   # Hash type is hardcoded to be sha256 for now.
+    (?P<hash>[^\#\s]+)\s*       # Hashes can be anything except '#' or spaces.
+    (?:\#\s+(?P<comment>.*))?   # Comments can be anything after a #, and are
+    """, re.X)                  # optional.
+
+
 def hashes_of_requirements(requirements):
     """Return a map of package names to lists of known-good hashes, given
     multiple requirements files."""
@@ -273,14 +282,11 @@ def hashes_of_requirements(requirements):
         """Yield hashes from contiguous comment lines before line
         ``line_number``."""
         for line_number in range(line_number - 1, 0, -1):
-            # If we hit a non-comment line, abort:
-            line = getline(path, line_number)
-            if not line.startswith('#'):
+            match = HASH_COMMENT_RE.match(getline(path, line_number))
+            if match:
+                yield match.groupdict()['hash']
+            else:
                 break
-
-            # If it's a hash line, add it to the pile:
-            if line.startswith('# sha256: '):
-                yield line.split(':', 1)[1].strip()
 
     expected_hashes = {}
     missing_hashes_req = []
