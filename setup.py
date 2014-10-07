@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='peep',
-    version='1.3',
+    version='1.4',
     description='A "pip install" that is cryptographically guaranteed repeatable',
     long_description=open('README.rst').read(),
     author='Erik Rose',
