@@ -20,6 +20,8 @@ setup(
     include_package_data=True,
     # No dependencies are declared for peep, even though it requires pip.
     # install_requires=['pip>=0.6.2'],
+    tests_require=['nose>=1.3.0,<2.0'],
+    test_suite='nose.collector',
     classifiers=[
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
@@ -32,5 +34,6 @@ setup(
         'Topic :: System :: Installation/Setup',
         'Topic :: System :: Systems Administration'
         ],
-    keywords=['pip', 'secure', 'repeatable', 'deploy', 'deployment', 'hash']
+    keywords=['pip', 'secure', 'repeatable', 'deploy', 'deployment', 'hash',
+              'install', 'installer']
 )

@@ -197,6 +197,7 @@ Version History
 
 1.4
   * Allow partial-line comments.
+  * Add the beginnings of a test suite.
 
 1.3
   * Pass through most args to the invocation of ``pip install`` that actually
