@@ -195,6 +195,9 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+1.4
+  * Allow partial-line comments.
+
 1.3
   * Pass through most args to the invocation of ``pip install`` that actually
     installs the downloaded archive. This means you can use things like

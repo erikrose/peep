@@ -53,7 +53,7 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
-__version__ = 1, 3, 0
+__version__ = 1, 4, 0
 
 
 ITS_FINE_ITS_FINE = 0
@@ -268,16 +268,23 @@ def requirements_path_and_line(req):
 
 HASH_COMMENT_RE = re.compile(
     r"""
-    \s*\#\s*                    # Lines that start with a '#'
-    (?P<hash_type>sha256):\s*   # Hash type is hardcoded to be sha256 for now.
-    (?P<hash>[^\#\s]+)\s*       # Hashes can be anything except '#' or spaces.
-    (?:\#\s*(?P<comment>.*))?   # Comments can be anything after a #, and are
-    """, re.X)                  # optional.
+    \s*\#\s+                   # Lines that start with a '#'
+    (?P<hash_type>sha256):\s+  # Hash type is hardcoded to be sha256 for now.
+    (?P<hash>[^\s]+)           # Hashes can be anything except '#' or spaces.
+    \s*                        # Suck up whitespace before the comment or
+                               #   just trailing whitespace if there is no
+                               #   comment. Also strip trailing newlines.
+    (?:\#(?P<comment>.*))?     # Comments can be anything after a whitespace+#
+    $""", re.X)                #   and are optional.
 
 
 def hashes_of_requirements(requirements):
-    """Return a map of package names to lists of known-good hashes, given
-    multiple requirements files."""
+    """Return (a map of package names to lists of known-good hashes, a list of
+    requirements not having any hashes specified).
+
+    :arg requirements: An iterable of InstallRequirements
+
+    """
     def hashes_above(path, line_number):
         """Yield hashes from contiguous comment lines before line
         ``line_number``."""
@@ -286,7 +293,7 @@ def hashes_of_requirements(requirements):
             match = HASH_COMMENT_RE.match(line)
             if match:
                 yield match.groupdict()['hash']
-            elif not line.startswith('#')
+            elif not line.lstrip().startswith('#'):
                 # If we hit a non-comment line, abort
                 break
 
