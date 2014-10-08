@@ -157,6 +157,18 @@ If your packages install from wheels or other potentially architecture-specific
 sources, their hashes will obviously differ across platforms. If you deploy on
 more than one, you'll need more than one hash.
 
+Upgrading wheels
+----------------
+
+If you're reusing your virtual environment, then you want to avoid wheels
+until a version of pip that upgrades wheels properly is out.
+
+If you're using pip 1.4, don't pass the ``--use-wheel`` argument.
+
+If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
+
+See https://github.com/pypa/pip/issues/1825 for more details.
+
 Old-PyPI Roulette
 -----------------
 
