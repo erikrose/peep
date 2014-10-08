@@ -150,37 +150,31 @@ Troubleshooting
 Are you suddenly getting the Fearsome Warning? Maybe you're really in trouble,
 but maybe something more innocuous is happening.
 
-Architecture-Specific Packages
-------------------------------
-
-If your packages install from wheels or other potentially architecture-specific
-sources, their hashes will obviously differ across platforms. If you deploy on
-more than one, you'll need more than one hash.
-
 Upgrading wheels
 ----------------
 
-If you're reusing your virtual environment, then you want to avoid wheels
-until a version of pip that upgrades wheels properly is out.
+If you're reusing a virtualenv, then you should avoid wheels until a version
+of pip that upgrades wheels properly is out. Otherwise, the old version of a
+package will not be entirely removed before the new one is installed. See
+https://github.com/pypa/pip/issues/1825 for more details.
 
 If you're using pip 1.4, don't pass the ``--use-wheel`` argument.
 
 If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 
-See https://github.com/pypa/pip/issues/1825 for more details.
+Multiple Hashes: Architecture-Specific Packages and Old Versions of PyPI
+------------------------------------------------------------------------
 
-Old-PyPI Roulette
------------------
+If your packages install from wheels or other potentially architecture-specific
+sources, their hashes will obviously differ across platforms. If you deploy on
+more than one, you'll need more than one hash.
 
-A few packages offer downloads in multiple formats: for example, zips and
+Also, a few packages offer downloads in multiple formats: for example, zips and
 tarballs. PyPI used to be unpredictable as to which it offered first, and pip
 simply takes the first one offered. Thus, if you're running an old version of
 PyPI internally or have some other Cheeseshop implementation which lacks a
 stable sort order, some packages may effectively have more than one valid hash
 for a given version.
-
-How To Specify Multiple Hashes
-------------------------------
 
 To support these scenarios, you can stack up multiple known-good hashes above a
 requirement, as long as they are within a contiguous block of commented lines::
@@ -210,6 +204,7 @@ Version History
 1.4
   * Allow partial-line comments.
   * Add the beginnings of a test suite.
+  * Treat package names in requirements files as case-insensitive, like pip.
 
 1.3
   * Pass through most args to the invocation of ``pip install`` that actually
