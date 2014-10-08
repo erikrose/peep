@@ -1,0 +1,10 @@
+language: python
+python:
+  - 3.4
+  - 3.3
+  - 2.7
+  - 2.6
+# Try it with the latest pip:
+install: pip install -U pip
+# command to run tests, e.g. python setup.py test
+script: python setup.py test
