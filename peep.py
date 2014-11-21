@@ -11,7 +11,9 @@ hashes in requirements.txt, and you're all set.
 """
 from __future__ import print_function
 from base64 import urlsafe_b64encode
+from collections import defaultdict
 from contextlib import contextmanager
+from functools import wraps
 from hashlib import sha256
 from itertools import chain
 from linecache import getline
@@ -53,7 +55,7 @@ from pip.log import logger
 from pip.req import parse_requirements
 
 
-__version__ = 1, 4, 0
+__version__ = 2, 0, 0
 
 
 ITS_FINE_ITS_FINE = 0
@@ -62,6 +64,7 @@ SOMETHING_WENT_WRONG = 1
 COMMAND_LINE_ERROR = 2
 
 ARCHIVE_EXTENSIONS = ('.tar.bz2', '.tar.gz', '.tgz', '.tar', '.zip')
+
 
 class PipException(Exception):
     """When I delegated to pip, it exited with an error."""
@@ -104,17 +107,18 @@ def run_pip(initial_args):
         raise PipException(status_code)
 
 
-def pip_download(req, argv, temp_path):
+def pip_download(requirements_path, line_number, temp_path):
     """Download a package, and return its filename.
 
-    :arg req: The InstallRequirement which describes the package
     :arg argv: Arguments to be passed along to pip, starting after the
         subcommand
     :arg temp_path: The path to the directory to download to
 
     """
     # Get the original line out of the reqs file:
-    line = getline(*requirements_path_and_line(req))
+    line = getline(requirements_path, line_number)
+
+    argv = []
 
     # Remove any requirement file args.
     argv = (['install', '--no-deps', '--download', temp_path] +
@@ -132,7 +136,10 @@ def pip_download(req, argv, temp_path):
     # one downloaded from PyPI, not a fresh tarring of unpacked files.
     run_pip(argv)
 
-    return (set(listdir(temp_path)) - old_contents).pop()
+    new = set(listdir(temp_path)) - old_contents
+    if len(new) != 1:
+        raise RuntimeError("Somebody threw a file into my temp dir while I was working in there.")
+    return new.pop()
 
 
 def pip_install_archives_from(temp_path, argv):
@@ -157,7 +164,7 @@ def hash_of_file(path):
 
 
 def is_git_sha(text):
-    """Returns True if this is probably a git sha"""
+    """Return whether this is probably a git sha"""
     # Handle both the full sha as well as the 7-character abbrviation
     if len(text) in (40, 7):
         try:
@@ -172,66 +179,6 @@ def filename_from_url(url):
     parsed = urlparse(url)
     path = parsed.path
     return path.split('/')[-1]
-
-
-def is_always_unsatisfied(req):
-    """Returns whether this requirement is always unsatisfied
-
-    This would happen in cases where we can't determine the version
-    from the filename.
-
-    """
-    # If this is a github sha tarball, then it is always unsatisfied
-    # because the url has a commit sha in it and not the version
-    # number.
-    url = req.url
-    if url:
-        filename = filename_from_url(url)
-        if filename.endswith(ARCHIVE_EXTENSIONS):
-            filename, ext = splitext(filename)
-            if is_git_sha(filename):
-                return True
-    return False
-
-
-def version_of_download(filename, package_name):
-    """Deduce the version number of a downloaded package from its filename.
-
-    :arg project_name: The ``unsafe_name`` of the requirement
-
-    """
-    def version_of_archive(filename, package_name):
-        # Since we know the project_name, we can strip that off the left, strip
-        # any archive extensions off the right, and take the rest as the
-        # version.
-        for ext in ARCHIVE_EXTENSIONS:
-            if filename.endswith(ext):
-                filename = filename[:-len(ext)]
-                break
-        # Handle github sha tarball downloads.
-        if is_git_sha(filename):
-            filename = package_name + '-' + filename
-        if not filename.lower().replace('_', '-').startswith(package_name.lower()):
-            # TODO: Should we replace runs of [^a-zA-Z0-9.], not just _, with -?
-            give_up(filename, package_name)
-        return filename[len(package_name) + 1:]  # Strip off '-' before version.
-
-    def version_of_wheel(filename, package_name):
-        # For Wheel files (http://legacy.python.org/dev/peps/pep-0427/#file-
-        # name-convention) we know the format bits are '-' separated.
-        whl_package_name, version, _rest = filename.split('-', 2)
-        # Do the alteration to package_name from PEP 427:
-        our_package_name = re.sub(r'[^\w\d.]+', '_', package_name, re.UNICODE)
-        if whl_package_name != our_package_name:
-            give_up(filename, whl_package_name)
-        return version
-
-    def give_up(filename, package_name):
-            raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
-                               (filename, package_name))
-
-    return (version_of_wheel if filename.endswith('.whl')
-            else version_of_archive)(filename, package_name)
 
 
 def requirement_args(argv, want_paths=False, want_other=False):
@@ -258,14 +205,6 @@ def requirement_args(argv, want_paths=False, want_other=False):
                 yield arg
 
 
-def requirements_path_and_line(req):
-    """Return the path and line number of the file from which an
-    InstallRequirement came."""
-    path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
-                  req.comes_from).groups())
-    return path, int(line)
-
-
 HASH_COMMENT_RE = re.compile(
     r"""
     \s*\#\s+                   # Lines that start with a '#'
@@ -276,58 +215,6 @@ HASH_COMMENT_RE = re.compile(
                                #   comment. Also strip trailing newlines.
     (?:\#(?P<comment>.*))?     # Comments can be anything after a whitespace+#
     $""", re.X)                #   and are optional.
-
-
-def hashes_of_requirements(requirements):
-    """Return (a map of package names to lists of known-good hashes, a list of
-    requirements not having any hashes specified).
-
-    :arg requirements: An iterable of InstallRequirements
-
-    """
-    def hashes_above(path, line_number):
-        """Yield hashes from contiguous comment lines before line
-        ``line_number``."""
-        for line_number in range(line_number - 1, 0, -1):
-            line = getline(path, line_number)
-            match = HASH_COMMENT_RE.match(line)
-            if match:
-                yield match.groupdict()['hash']
-            elif not line.lstrip().startswith('#'):
-                # If we hit a non-comment line, abort
-                break
-
-    expected_hashes = {}
-    missing_hashes_req = []
-
-    for req in requirements:  # InstallRequirements
-        path, line_number = requirements_path_and_line(req)
-        hashes = list(hashes_above(path, line_number))
-        if hashes:
-            hashes.reverse()  # because we read them backwards
-            expected_hashes[req.name] = hashes
-        else:
-            missing_hashes_req.append(req)
-    return expected_hashes, missing_hashes_req
-
-
-def hash_mismatches(expected_hash_map, downloaded_hashes):
-    """Yield the list of allowed hashes, package name, and download-hash of
-    each package whose download-hash didn't match one allowed for it in the
-    requirements file.
-
-    If a package is missing from ``download_hashes``, ignore it; that means
-    it's already installed and we're not risking anything.
-
-    """
-    for package_name, expected_hashes in expected_hash_map.items():
-        try:
-            hash_of_download = downloaded_hashes[package_name]
-        except KeyError:
-            pass
-        else:
-            if hash_of_download not in expected_hashes:
-                yield expected_hashes, package_name, hash_of_download
 
 
 def peep_hash(argv):
@@ -363,6 +250,276 @@ class EmptyOptions(object):
     skip_requirements_regex = None
 
 
+def memoize(func):
+    cache = []
+
+    @wraps(func)
+    def memoizer(self):
+        if not cache:
+            cache.append(func(self))
+        return cache[0]
+    return memoizer
+
+
+class DownloadedReq(object):
+    """A wrapper around InstallRequirement which offers additional information
+    based on downloading and examining a corresponding package archive
+
+    These are conceptually immutable, so we can get away with memoizing
+    expensive things.
+
+    """
+    def __init__(self, req, temp_path):
+        """Download a requirement, compare its hashes, and return a subclass
+        of DownloadedReq depending on its state.
+
+        :arg req: The InstallRequirement I am based on
+        :arg temp_path: A path to a temp dir in which to store downloads
+
+        """
+        self.req = req
+        self.temp_path = temp_path
+        self.__class__ = self._class()
+
+    def _version(self):
+        """Deduce the version number of the downloaded package from its filename."""
+        def version_of_archive(filename, package_name):
+            # Since we know the project_name, we can strip that off the left, strip
+            # any archive extensions off the right, and take the rest as the
+            # version.
+            for ext in ARCHIVE_EXTENSIONS:
+                if filename.endswith(ext):
+                    filename = filename[:-len(ext)]
+                    break
+            # Handle github sha tarball downloads.
+            if is_git_sha(filename):
+                filename = package_name + '-' + filename
+            if not filename.lower().replace('_', '-').startswith(package_name.lower()):
+                # TODO: Should we replace runs of [^a-zA-Z0-9.], not just _, with -?
+                give_up(filename, package_name)
+            return filename[len(package_name) + 1:]  # Strip off '-' before version.
+
+        def version_of_wheel(filename, package_name):
+            # For Wheel files (http://legacy.python.org/dev/peps/pep-0427/#file-
+            # name-convention) we know the format bits are '-' separated.
+            whl_package_name, version, _rest = filename.split('-', 2)
+            # Do the alteration to package_name from PEP 427:
+            our_package_name = re.sub(r'[^\w\d.]+', '_', package_name, re.UNICODE)
+            if whl_package_name != our_package_name:
+                give_up(filename, whl_package_name)
+            return version
+
+        def give_up(filename, package_name):
+            raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
+                               (filename, package_name))
+
+        return (version_of_wheel if self._download_filename().endswith('.whl')
+                else version_of_archive)(self._download_filename(),
+                                         self._project_name())
+
+    def _is_always_unsatisfied(self):
+        """Returns whether this requirement is always unsatisfied
+
+        This would happen in cases where we can't determine the version
+        from the filename.
+
+        """
+        # If this is a github sha tarball, then it is always unsatisfied
+        # because the url has a commit sha in it and not the version
+        # number.
+        url = self.req.url
+        if url:
+            filename = filename_from_url(url)
+            if filename.endswith(ARCHIVE_EXTENSIONS):
+                filename, ext = splitext(filename)
+                if is_git_sha(filename):
+                    return True
+        return False
+
+    def _path_and_line(self):
+        """Return the path and line number of the file from which our
+        InstallRequirement came.
+
+        """
+        path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
+                      self.req.comes_from).groups())
+        return path, int(line)
+
+    @memoize  # Avoid hitting the file[cache] over and over.
+    def _expected_hashes(self):
+        """Return a list of known-good hashes for this package."""
+
+        def hashes_above(path, line_number):
+            """Yield hashes from contiguous comment lines before line
+            ``line_number``.
+            
+            """
+            for line_number in xrange(line_number - 1, 0, -1):
+                line = getline(path, line_number)
+                match = HASH_COMMENT_RE.match(line)
+                if match:
+                    yield match.groupdict()['hash']
+                elif not line.lstrip().startswith('#'):
+                    # If we hit a non-comment line, abort
+                    break
+
+        hashes = list(hashes_above(*self._path_and_line()))
+        hashes.reverse()  # because we read them backwards
+        return hashes
+
+    @memoize  # Avoid re-downloading.
+    def _download_filename(self):
+        """Download the package's archive if necessary, and return its filename."""
+        path, line = self._path_and_line()
+        return pip_download(path, line, self.temp_path)
+
+    @memoize
+    def _actual_hash(self):
+        """Download the package's archive if necessary, and return its hash."""
+        return hash_of_file(join(self.temp_path, self._download_filename()))
+
+    def _project_name(self):
+        """Return the inner Requirement's "unsafe name".
+
+        Raise ValueError if there is no name.
+
+        """
+        name = getattr(self.req.req, 'project_name', '')
+        if name:
+            return name
+        raise ValueError('Requirement has no project_name.')
+
+    def _name(self):
+        return self.req.name
+
+    def _url(self):
+        return self.req.url
+
+    @memoize  # Avoid re-running expensive check_if_exists().
+    def _is_satisfied(self):
+        self.req.check_if_exists()
+        return (self.req.satisfied_by and
+                not self._is_always_unsatisfied())
+
+    def _class(self):
+        """Return the class I should be, spanning a continuum of goodness."""
+        try:
+            self._project_name()
+        except ValueError:
+            return MalformedReq
+        if self._is_satisfied():
+            return SatisfiedReq
+        if not self._expected_hashes():
+            return MissingReq
+        if self._actual_hash() not in self._expected_hashes():
+            return MismatchedReq
+        return InstallableReq
+
+    @classmethod
+    def foot(cls):
+        return ''
+
+
+class MalformedReq(DownloadedReq):
+    """A requirement whose package name could not be determined"""
+
+    @classmethod
+    def head(cls):
+        return 'The following requirements could not be processed:\n'
+
+    def error(self):
+        return '* Unable to determine package name from URL %s; add #egg=' % self._url()
+
+
+class MissingReq(DownloadedReq):
+    """A requirement for which no hashes were specified in the requirements file"""
+
+    @classmethod
+    def head(cls):
+        return ('The following packages had no hashes specified in the requirements file, which\n'
+                'leaves them open to tampering. Vet these packages to your satisfaction, then\n'
+                'add these "sha256" lines like so:\n\n')
+
+    def error(self):
+        if self._url():
+            line = self._url()
+            if self._name() not in filename_from_url(self._url()):
+                line = '%s#egg=%s' % (line, self._name())
+        else:
+            line = '%s==%s' % (self._name(), self._version())
+        return '# sha256: %s\n%s\n' % (self._actual_hash(), line)
+
+
+class MismatchedReq(DownloadedReq):
+    """A requirement for which the downloaded file didn't match any of my hashes."""
+    @classmethod
+    def head(cls):
+        return ("THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE REQUIREMENTS\n"
+                "FILE. If you have updated the package versions, update the hashes. If not,\n"
+                "freak out, because someone has tampered with the packages.\n\n")
+
+    def error(self):
+        preamble = '    %s: expected%s' % (
+                self._project_name(),
+                ' one of' if len(self._expected_hashes()) > 1 else '')
+        return '%s %s\n%s got %s' % (
+            preamble,
+            ('\n' + ' ' * (len(preamble) + 1)).join(self._expected_hashes()),
+            ' ' * (len(preamble) - 4),
+            self._actual_hash())
+
+    @classmethod
+    def foot(cls):
+        return '\n'
+
+
+class SatisfiedReq(DownloadedReq):
+    """A requirement which turned out to be already installed"""
+
+    @classmethod
+    def head(cls):
+        return ("These packages were already installed, so we didn't need to download or build\n"
+                "them again. If you installed them with peep in the first place, you should be\n"
+                "safe. If not, uninstall them, then re-attempt your install with peep.\n")
+
+    def error(self):
+        return '   %s' % (self.req,)
+
+
+class InstallableReq(DownloadedReq):
+    """A requirement whose hash matched and can be safely installed"""
+
+
+# DownloadedReq subclasses that indicate an error that should keep us from
+# going forward with installation, in the order in which their errors should
+# be reported:
+ERROR_CLASSES = [MismatchedReq, MissingReq, MalformedReq]
+
+
+def bucket(things, key):
+    """Return a map of key -> list of things."""
+    ret = defaultdict(list)
+    for thing in things:
+        ret[key(thing)].append(thing)
+    return ret
+
+
+def first_every_last(iterable, first, every, last):
+    """Execute something before the first item of iter, something else for each
+    item, and a third thing after the last.
+
+    If there are no items in the iterable, don't execute anything.
+
+    """
+    did_first = False
+    for item in iterable:
+        if not did_first:
+            first(item)
+        every(item)
+    if did_first:
+        last(item)
+
+
 def peep_install(argv):
     """Perform the ``peep install`` subcommand, returning a shell status code
     or raising a PipException.
@@ -370,98 +527,46 @@ def peep_install(argv):
     :arg argv: The commandline args, starting after the subcommand
 
     """
-    req_paths = list(requirement_args(argv, want_paths=True))
-    if not req_paths:
-        print("You have to specify one or more requirements files with the -r option, because")
-        print("otherwise there's nowhere for peep to look up the hashes.")
-        return COMMAND_LINE_ERROR
+    output = []
+    out = output.append
+    try:
+        req_paths = list(requirement_args(argv, want_paths=True))
+        if not req_paths:
+            out("You have to specify one or more requirements files with the -r option, because\n")
+            out("otherwise there's nowhere for peep to look up the hashes.\n")
+            return COMMAND_LINE_ERROR
 
-    # We're a "peep install" command, and we have some requirement paths.
-    requirements = list(chain(*(parse_requirements(path,
-                                                   options=EmptyOptions())
-                                for path in req_paths)))
-    downloaded_hashes, downloaded_versions, satisfied_reqs, malformed_reqs = {}, {}, [], []
+        with ephemeral_dir() as temp_path:
+            # We're a "peep install" command, and we have some requirement paths.
+            reqs = chain.from_iterable(
+                parse_requirements(path, options=EmptyOptions())
+                for path in req_paths)
+            reqs = [DownloadedReq(req, temp_path) for req in reqs]
+            buckets = bucket(reqs, lambda r: r.__class__)
 
-    with ephemeral_dir() as temp_path:
-        for req in requirements:
-            if not req.req or not req.req.project_name:
-                malformed_reqs.append('Unable to determine package name from URL %s; add #egg=' % req.url)
-                continue
+            # Skip a line after pip's "Cleaning up..." so the important stuff
+            # stands out:
+            if any(buckets[b] for b in ERROR_CLASSES):
+                out('\n')
 
-            req.check_if_exists()
-            if req.satisfied_by and not is_always_unsatisfied(req):
-                # This is already installed or we don't know the
-                # version number from the requirement line, so we can
-                # never know if this is satisfied.
-                satisfied_reqs.append(req)
+            printers = (lambda r: out(r.head()),
+                        lambda r: out(r.error() + '\n'),
+                        lambda r: out(r.foot()))
+            for c in ERROR_CLASSES:
+                first_every_last(buckets[c], *printers)
+
+            if any(buckets[b] for b in ERROR_CLASSES):
+                out('-------------------------------\n')
+                out('Not proceeding to installation.\n')
+                return SOMETHING_WENT_WRONG
             else:
-                name = req.req.project_name  # unsafe name
-                archive_filename = pip_download(req, argv, temp_path)
-                downloaded_hashes[name] = hash_of_file(join(temp_path, archive_filename))
-                downloaded_versions[name] = version_of_download(archive_filename, name)
+                pip_install_archives_from(temp_path, argv)
 
-        expected_hashes, missing_hashes_reqs = hashes_of_requirements(requirements)
-        mismatches = list(hash_mismatches(expected_hashes, downloaded_hashes))
+                first_every_last(buckets[SatisfiedReq], *printers)
 
-        # Remove satisfied_reqs from missing_hashes, preserving order:
-        satisfied_req_names = set(req.name for req in satisfied_reqs)
-        missing_hashes_reqs = [req for req in missing_hashes_reqs if req.name not in satisfied_req_names]
-
-        # Skip a line after pip's "Cleaning up..." so the important stuff
-        # stands out:
-        if mismatches or missing_hashes_reqs or malformed_reqs:
-            print()
-
-        # Mismatched hashes:
-        if mismatches:
-            print("THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE REQUIREMENTS")
-            print("FILE. If you have updated the package versions, update the hashes. If not,")
-            print("freak out, because someone has tampered with the packages.\n")
-        for expected_hashes, package_name, hash_of_download in mismatches:
-            hash_of_download = downloaded_hashes[package_name]
-            preamble = '    %s: expected%s' % (
-                    package_name,
-                    ' one of' if len(expected_hashes) > 1 else '')
-            print(preamble, end=' ')
-            print(('\n' + ' ' * (len(preamble) + 1)).join(expected_hashes))
-            print(' ' * (len(preamble) - 4), 'got', hash_of_download)
-        if mismatches:
-            print()  # Skip a line before "Not proceeding..."
-
-        # Missing hashes:
-        if missing_hashes_reqs:
-            print('The following packages had no hashes specified in the requirements file, which')
-            print('leaves them open to tampering. Vet these packages to your satisfaction, then')
-            print('add these "sha256" lines like so:\n')
-        for req in missing_hashes_reqs:
-            print('# sha256: %s' % downloaded_hashes[req.name])
-            if req.url:
-                line = req.url
-                if req.name not in filename_from_url(req.url):
-                    line = '%s#egg=%s' % (line, req.name)
-            else:
-                line = '%s==%s' % (req.name, downloaded_versions[req.name])
-            print(line + '\n')
-
-        if malformed_reqs:
-            print('The following requirements could not be processed:')
-            print('*', '\n* '.join(malformed_reqs))
-
-        if mismatches or missing_hashes_reqs or malformed_reqs:
-            print('-------------------------------')
-            print('Not proceeding to installation.')
-            return SOMETHING_WENT_WRONG
-        else:
-            pip_install_archives_from(temp_path, argv)
-
-            if satisfied_reqs:
-                print("These packages were already installed, so we didn't need to download or build")
-                print("them again. If you installed them with peep in the first place, you should be")
-                print("safe. If not, uninstall them, then re-attempt your install with peep.")
-                for req in satisfied_reqs:
-                    print('   ', req.req)
-
-    return ITS_FINE_ITS_FINE
+        return ITS_FINE_ITS_FINE
+    finally:
+        print(''.join(output))
 
 
 def main():
@@ -476,6 +581,7 @@ def main():
             return pip.main()
     except PipException as exc:
         return exc.error_code
+
 
 if __name__ == '__main__':
     exit(main())
