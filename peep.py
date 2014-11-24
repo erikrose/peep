@@ -12,7 +12,6 @@ hashes in requirements.txt, and you're all set.
 from __future__ import print_function
 from base64 import urlsafe_b64encode
 from collections import defaultdict
-from contextlib import contextmanager
 from functools import wraps
 from hashlib import sha256
 from itertools import chain
@@ -21,7 +20,6 @@ from optparse import OptionParser
 from os import listdir
 from os.path import join, basename, splitext
 import re
-import shlex
 from shutil import rmtree
 from sys import argv, exit
 from tempfile import mkdtemp
@@ -84,15 +82,6 @@ def encoded_hash(sha):
     return urlsafe_b64encode(sha.digest()).decode('ascii').rstrip('=')
 
 
-@contextmanager
-def ephemeral_dir():
-    dir = mkdtemp(prefix='peep-')
-    try:
-        yield dir
-    finally:
-        rmtree(dir)
-
-
 def run_pip(initial_args):
     """Delegate to pip the given args (starting with the subcommand), and raise
     ``PipException`` if something goes wrong."""
@@ -105,283 +94,6 @@ def run_pip(initial_args):
 
     if status_code:
         raise PipException(status_code)
-
-
-# Based on req_set.prepare_files() in pip bb2a8428d4aebc8d313d05d590f386fa3f0bbd0f
-# finder = PackageFinder(
-#             find_links=options.find_links,
-#             index_urls=index_urls,
-#             use_wheel=options.use_wheel,
-#             allow_external=options.allow_external,
-#             allow_unverified=options.allow_unverified,
-#             allow_all_external=options.allow_all_external,
-#             allow_all_prereleases=options.pre,
-#             process_dependency_links=options.process_dependency_links,
-#             session=session,
-#         )  # That's true in both wheel and non-wheel installs.
-# dependency_links are okay; those are just additional web page URLs to check.
-# Maybe delete stuff that doesn't make any sense in a peep context, like things that deal with package upgrades (of already satisfied requirements), which shouldn't happen for ==-style requirements. I suspect our decisions about satisfiedness are already made by the time we hit this, by DownloadedReq.
-def prepare_files(requirements, finder, ignore_installed, editable, force_reinstall, upgrade, use_user_site, src_dir, build_dir, download_dir, wheel_download_dir, session):
-    # Previously: Prepare process. Create temp directories, download and/or unpack files.
-    """Download all necessary files for each requirement.
-    
-    Somebody else can figure out how to hash and compare them.
-    
-    """
-    # Based on is_download()
-    def download_dir_exists(download_dir):
-        """Return whether an existent download dir is given, and normalize it."""
-        if download_dir:
-            download_dir = os.path.expanduser(download_dir)
-            if os.path.exists(download_dir):
-                return download_dir, True
-            else:
-                logger.critical('Could not find download directory')
-                raise InstallationError(
-                    "Could not find or access download directory '%s'"
-                    % display_path(download_dir))
-        return download_dir, False
-
-    download_dir, is_download = download_dir_exists(download_dir)
-
-    for req_to_install in requirements:
-        install = True
-        best_installed = False
-        not_found = None
-
-        # ############################################# #
-        # # Search for archive to fulfill requirement # #
-        # ############################################# #
-
-        if not ignore_installed and not req_to_install.editable:
-            req_to_install.check_if_exists()
-            if req_to_install.satisfied_by:
-#                 if upgrade:
-#                     if not force_reinstall and not req_to_install.url:
-#                         try:
-#                             url = finder.find_requirement(
-#                                 req_to_install, upgrade)
-#                         except BestVersionAlreadyInstalled:
-#                             best_installed = True
-#                             install = False
-#                         except DistributionNotFound as exc:
-#                             not_found = exc
-#                         else:
-#                             # Avoid the need to call find_requirement again
-#                             req_to_install.url = url.url
-# 
-#                     if not best_installed:
-#                         # don't uninstall conflict if user install and
-#                         # conflict is not user install
-#                         if not (use_user_site
-#                                 and not dist_in_usersite(
-#                                     req_to_install.satisfied_by
-#                                 )):
-#                             req_to_install.conflicts_with = \
-#                                 req_to_install.satisfied_by
-#                         req_to_install.satisfied_by = None
-#                 else:
-                    install = False
-            if req_to_install.satisfied_by:
-#                 if best_installed:
-#                     logger.info(
-#                         'Requirement already up-to-date: %s',
-#                         req_to_install,
-#                     )
-#                 else:
-#                     logger.info(
-#                         'Requirement already satisfied (use --upgrade to '
-#                         'upgrade): %s',
-#                         req_to_install,
-#                     )
-        if req_to_install.editable:
-            logger.info('Obtaining %s', req_to_install)
-        elif install:
-            if (req_to_install.url
-                    and req_to_install.url.lower().startswith('file:')):
-                logger.info(
-                    'Unpacking %s',
-                    display_path(url_to_path(req_to_install.url)),
-                )
-            else:
-                logger.info('Downloading/unpacking %s', req_to_install)
-
-        with indent_log():
-            # ################################ #
-            # # vcs update or unpack archive # #
-            # ################################ #
-
-            is_wheel = False
-            if req_to_install.editable:
-                if req_to_install.source_dir is None:
-                    location = req_to_install.build_location(src_dir)
-                    req_to_install.source_dir = location
-                else:
-                    location = req_to_install.source_dir
-                if not os.path.exists(build_dir):
-                    _make_build_dir(build_dir)
-                req_to_install.update_editable(not is_download)  # vcs checkouts and file:// URLs
-                if is_download:
-                    req_to_install.run_egg_info()  # HOLY CRAP DON'T DO THIS unless we can git fsck the download or something. Or maybe git against remote servers is trustworthy now: http://www.mythmon.com/posts/malicious-git-servers.html.
-                    req_to_install.archive(download_dir)
-                else:
-                    req_to_install.run_egg_info()  # HOLY CRAP DON'T DO THIS
-            elif install:
-                # @@ if filesystem packages are not marked
-                # editable in a req, a non deterministic error
-                # occurs when the script attempts to unpack the
-                # build directory
-
-                # NB: This call can result in the creation of a temporary
-                # build directory
-                location = req_to_install.build_location(
-                    build_dir,
-                    not is_download,
-                )
-                unpack = True
-                url = None
-
-                # If a checkout exists, it's unwise to keep going.  version
-                # inconsistencies are logged later, but do not fail the
-                # installation.
-                if os.path.exists(os.path.join(location, 'setup.py')):
-                    raise PreviousBuildDirError(
-                        "pip can't proceed with requirements '%s' due to a"
-                        " pre-existing build directory (%s). This is "
-                        "likely due to a previous installation that failed"
-                        ". pip is being responsible and not assuming it "
-                        "can delete this. Please delete it and try again."
-                        % (req_to_install, location)
-                    )
-                else:
-                    # FIXME: this won't upgrade when there's an existing
-                    # package unpacked in `location`
-                    if req_to_install.url is None:
-                        if not_found:
-                            raise not_found
-                        url = finder.find_requirement(
-                            req_to_install,
-                            upgrade=upgrade,
-                        )
-                    else:
-                        # FIXME: should req_to_install.url already be a
-                        # link?
-                        url = Link(req_to_install.url)
-                        assert url
-                    if url:
-                        try:
-
-                            if (
-                                url.filename.endswith(wheel_ext)
-                                and wheel_download_dir
-                            ):
-                                # when doing 'pip wheel`
-                                download_dir = wheel_download_dir
-                                do_download = True
-                            else:
-                                download_dir = download_dir
-                                do_download = is_download
-                            unpack_url(
-                                url, location, download_dir,
-                                do_download, session=session,
-                            )
-                        except requests.HTTPError as exc:
-                            logger.critical(
-                                'Could not install requirement %s because '
-                                'of error %s',
-                                req_to_install,
-                                exc,
-                            )
-                            raise InstallationError(
-                                'Could not install requirement %s because '
-                                'of HTTP error %s for URL %s' %
-                                (req_to_install, exc, url)
-                            )
-                    else:
-                        unpack = False
-                # All we probably need from here down (and maybe not even this) is to zip up any VCS-checked-out requirements so they can be pip installed later. We don't care about assert_source_matches_version() or .satisfied_by, because we ensure accuracy by comparing hashes externally, and we deal with satisfaction externally as well.
-                if unpack:
-                    is_wheel = url and url.filename.endswith(wheel_ext)
-                    if is_download:
-                        req_to_install.source_dir = location
-                        if not is_wheel:
-                            # FIXME:https://github.com/pypa/pip/issues/1112
-                            req_to_install.run_egg_info()  # NOPE NOPE NOPE
-                        if url and url.scheme in vcs.all_schemes:
-                            req_to_install.archive(download_dir)
-                    elif is_wheel:
-                        req_to_install.source_dir = location
-                        req_to_install.url = url.url
-                    else:
-                        req_to_install.source_dir = location
-                        req_to_install.run_egg_info()  # NOPE
-                        req_to_install.assert_source_matches_version()
-                    # req_to_install.req is only avail after unpack for URL
-                    # pkgs repeat check_if_exists to uninstall-on-upgrade
-                    # (#14)
-                    if not ignore_installed:
-                        req_to_install.check_if_exists()
-                    if req_to_install.satisfied_by:
-                        if upgrade or ignore_installed:
-                            # don't uninstall conflict if user install and
-                            # conflict is not user install
-                            if not (use_user_site
-                                    and not dist_in_usersite(
-                                        req_to_install.satisfied_by)):
-                                req_to_install.conflicts_with = \
-                                    req_to_install.satisfied_by
-                            req_to_install.satisfied_by = None
-                        else:
-                            logger.info(
-                                'Requirement already satisfied (use '
-                                '--upgrade to upgrade): %s',
-                                req_to_install,
-                            )
-                            install = False
-
-
-def download(requirements_path, line_number, temp_path):
-    """Download a package, and return its filename.
-
-    :arg argv: Arguments to be passed along to pip, starting after the
-        subcommand
-    :arg temp_path: The path to the directory to download to
-
-    """
-    # Get the original line out of the reqs file:
-    line = getline(requirements_path, line_number)
-
-    argv = []
-
-    # Remove any requirement file args.
-    argv = (['install', '--no-deps', '--download', temp_path] +
-            list(requirement_args(argv, want_other=True)) +  # other args
-            shlex.split(line))  # ['nose==1.3.0']. split() removes trailing \n.
-
-    # Remember what was in the dir so we can backtrack and tell what we've
-    # downloaded (disgusting):
-    old_contents = set(listdir(temp_path))
-
-    # pip downloads the tarball into a second temp dir it creates, then it
-    # copies it to our specified download dir, then it unpacks it into the
-    # build dir in the venv (probably to read metadata out of it), then it
-    # deletes that. Don't be afraid: the tarball we're hashing is the pristine
-    # one downloaded from PyPI, not a fresh tarring of unpacked files.
-    run_pip(argv)
-
-    new = set(listdir(temp_path)) - old_contents
-    if len(new) != 1:
-        raise RuntimeError("Somebody threw a file into my temp dir while I was working in there.")
-    return new.pop()
-
-
-def pip_install_archives_from(temp_path, argv):
-    """pip install the archives from the ``temp_path`` dir, omitting
-    dependencies."""
-    other_args = list(requirement_args(argv, want_other=True))
-    for filename in listdir(temp_path):
-        archive_path = join(temp_path, filename)
-        run_pip(['install'] + other_args +  ['--no-deps', archive_path])
 
 
 def hash_of_file(path):
@@ -502,20 +214,35 @@ class DownloadedReq(object):
     expensive things.
 
     """
-    def __init__(self, req, temp_path):
+    def __init__(self, req):
         """Download a requirement, compare its hashes, and return a subclass
         of DownloadedReq depending on its state.
 
         :arg req: The InstallRequirement I am based on
-        :arg temp_path: A path to a temp dir in which to store downloads
 
         """
         self.req = req
-        self.temp_path = temp_path
+
+        # We use a separate temp dir for each requirement so requirements
+        # (from different indices) that happen to have the same archive names
+        # don't overwrite each other, leading to a security hole in which the
+        # latter is a hash mismatch, the former has already passed the
+        # comparison, and the latter gets installed.
+        self._temp_path = mkdtemp(prefix='peep-')
         self.__class__ = self._class()
+
+    def dispose(self):
+        """Delete temp files and dirs I've made. Render myself useless.
+
+        Do not call further methods on me after calling dispose().
+
+        """
+        rmtree(self._temp_path)
 
     def _version(self):
         """Deduce the version number of the downloaded package from its filename."""
+        # TODO: Can we delete this method and just print the line from the
+        # reqs file verbatim instead?
         def version_of_archive(filename, package_name):
             # Since we know the project_name, we can strip that off the left, strip
             # any archive extensions off the right, and take the rest as the
@@ -546,8 +273,8 @@ class DownloadedReq(object):
             raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
                                (filename, package_name))
 
-        return (version_of_wheel if self._download_filename().endswith('.whl')
-                else version_of_archive)(self._download_filename(),
+        return (version_of_wheel if self._downloaded_filename().endswith('.whl')
+                else version_of_archive)(self._downloaded_filename(),
                                          self._project_name())
 
     def _is_always_unsatisfied(self):
@@ -585,7 +312,7 @@ class DownloadedReq(object):
         def hashes_above(path, line_number):
             """Yield hashes from contiguous comment lines before line
             ``line_number``.
-            
+
             """
             for line_number in xrange(line_number - 1, 0, -1):
                 line = getline(path, line_number)
@@ -600,16 +327,247 @@ class DownloadedReq(object):
         hashes.reverse()  # because we read them backwards
         return hashes
 
+    # Based on req_set.prepare_files() in pip bb2a8428d4aebc8d313d05d590f386fa3f0bbd0f
     @memoize  # Avoid re-downloading.
-    def _download_filename(self):
+    def _downloaded_filename(self):
         """Download the package's archive if necessary, and return its filename."""
-        path, line = self._path_and_line()
-        return download(path, line, self.temp_path)
+        # TODO: --no-deps (which my be implied in our changes to prepare_files()
+        # finder = PackageFinder(
+        #             find_links=options.find_links,
+        #             index_urls=index_urls,
+        #             use_wheel=options.use_wheel,
+        #             allow_external=options.allow_external,
+        #             allow_unverified=options.allow_unverified,
+        #             allow_all_external=options.allow_all_external,
+        #             allow_all_prereleases=options.pre,
+        #             process_dependency_links=options.process_dependency_links,
+        #             session=session,
+        #         )  # That's true in both wheel and non-wheel installs.
+        # dependency_links are okay; those are just additional web page URLs to check.
+        # Maybe delete stuff that doesn't make any sense in a peep context, like things that deal with package upgrades (of already satisfied requirements), which shouldn't happen for ==-style requirements. I suspect our decisions about satisfiedness are already made by the time we hit this, by DownloadedReq.
+    #def prepare_files(req, finder, ignore_installed, editable, force_reinstall, upgrade, use_user_site, src_dir, build_dir, download_dir, wheel_download_dir, session):
+        # Based on is_download() from pip:
+        def download_dir_exists(download_dir):
+            """Return whether an existent download dir is given, and normalize it."""
+            if download_dir:
+                download_dir = os.path.expanduser(download_dir)
+                if os.path.exists(download_dir):
+                    return download_dir, True
+                else:
+                    logger.critical('Could not find download directory')
+                    raise InstallationError(
+                        "Could not find or access download directory '%s'"
+                        % display_path(download_dir))
+            return download_dir, False
+
+        download_dir, is_download = download_dir_exists(download_dir)
+
+        install = True
+        best_installed = False
+        not_found = None
+
+        # ############################################# #
+        # # Search for archive to fulfill requirement # #
+        # ############################################# #
+
+        if not ignore_installed and not req.editable:
+            req.check_if_exists()
+            if req.satisfied_by:
+    #                 if upgrade:
+    #                     if not force_reinstall and not req.url:
+    #                         try:
+    #                             url = finder.find_requirement(
+    #                                 req, upgrade)
+    #                         except BestVersionAlreadyInstalled:
+    #                             best_installed = True
+    #                             install = False
+    #                         except DistributionNotFound as exc:
+    #                             not_found = exc
+    #                         else:
+    #                             # Avoid the need to call find_requirement again
+    #                             req.url = url.url
+    #
+    #                     if not best_installed:
+    #                         # don't uninstall conflict if user install and
+    #                         # conflict is not user install
+    #                         if not (use_user_site
+    #                                 and not dist_in_usersite(
+    #                                     req.satisfied_by
+    #                                 )):
+    #                             req.conflicts_with = \
+    #                                 req.satisfied_by
+    #                         req.satisfied_by = None
+    #                 else:
+                    install = False
+            if req.satisfied_by:
+    #                 if best_installed:
+    #                     logger.info(
+    #                         'Requirement already up-to-date: %s',
+    #                         req,
+    #                     )
+    #                 else:
+    #                     logger.info(
+    #                         'Requirement already satisfied (use --upgrade to '
+    #                         'upgrade): %s',
+    #                         req,
+    #                     )
+        if req.editable:
+            logger.info('Obtaining %s', req)
+        elif install:
+            if (req.url
+                    and req.url.lower().startswith('file:')):
+                logger.info(
+                    'Unpacking %s',
+                    display_path(url_to_path(req.url)),
+                )
+            else:
+                logger.info('Downloading/unpacking %s', req)
+
+        with indent_log():
+            # ################################ #
+            # # vcs update or unpack archive # #
+            # ################################ #
+
+            is_wheel = False
+            if req.editable:
+                if req.source_dir is None:
+                    location = req.build_location(src_dir)
+                    req.source_dir = location
+                else:
+                    location = req.source_dir
+                if not os.path.exists(build_dir):
+                    _make_build_dir(build_dir)
+                req.update_editable(not is_download)  # vcs checkouts and file:// URLs
+                if is_download:
+                    req.run_egg_info()  # HOLY CRAP DON'T DO THIS unless we can git fsck the download or something. Or maybe git against remote servers is trustworthy now: http://www.mythmon.com/posts/malicious-git-servers.html.
+                    req.archive(download_dir)
+                else:
+                    req.run_egg_info()  # HOLY CRAP DON'T DO THIS
+            elif install:
+                # @@ if filesystem packages are not marked
+                # editable in a req, a non deterministic error
+                # occurs when the script attempts to unpack the
+                # build directory
+
+                # NB: This call can result in the creation of a temporary
+                # build directory
+                location = req.build_location(
+                    build_dir,
+                    not is_download,
+                )
+                unpack = True
+                url = None
+
+                # If a checkout exists, it's unwise to keep going.  version
+                # inconsistencies are logged later, but do not fail the
+                # installation.
+                if os.path.exists(os.path.join(location, 'setup.py')):
+                    raise PreviousBuildDirError(
+                        "pip can't proceed with requirements '%s' due to a"
+                        " pre-existing build directory (%s). This is "
+                        "likely due to a previous installation that failed"
+                        ". pip is being responsible and not assuming it "
+                        "can delete this. Please delete it and try again."
+                        % (req, location)
+                    )
+                else:
+                    # FIXME: this won't upgrade when there's an existing
+                    # package unpacked in `location`
+                    if req.url is None:
+                        if not_found:
+                            raise not_found
+                        url = finder.find_requirement(
+                            req,
+                            upgrade=upgrade,
+                        )
+                    else:
+                        # FIXME: should req.url already be a
+                        # link?
+                        url = Link(req.url)
+                        assert url
+                    if url:
+                        try:
+
+                            if (
+                                url.filename.endswith(wheel_ext)
+                                and wheel_download_dir
+                            ):
+                                # when doing 'pip wheel`
+                                download_dir = wheel_download_dir
+                                do_download = True
+                            else:
+                                download_dir = download_dir
+                                do_download = is_download
+                            unpack_url(
+                                url, location, download_dir,
+                                do_download, session=session,
+                            )
+                        except requests.HTTPError as exc:
+                            logger.critical(
+                                'Could not install requirement %s because '
+                                'of error %s',
+                                req,
+                                exc,
+                            )
+                            raise InstallationError(
+                                'Could not install requirement %s because '
+                                'of HTTP error %s for URL %s' %
+                                (req, exc, url)
+                            )
+                    else:
+                        unpack = False
+                # All we probably need from here down (and maybe not even this) is to zip up any VCS-checked-out requirements so they can be pip installed later. We don't care about assert_source_matches_version() or .satisfied_by, because we ensure accuracy by comparing hashes externally, and we deal with satisfaction externally as well.
+                if unpack:
+                    is_wheel = url and url.filename.endswith(wheel_ext)
+                    if is_download:
+                        req.source_dir = location
+                        if not is_wheel:
+                            # FIXME:https://github.com/pypa/pip/issues/1112
+                            req.run_egg_info()  # NOPE NOPE NOPE
+                        if url and url.scheme in vcs.all_schemes:
+                            req.archive(download_dir)
+                    elif is_wheel:
+                        req.source_dir = location
+                        req.url = url.url
+                    else:
+                        req.source_dir = location
+                        req.run_egg_info()  # NOPE
+                        req.assert_source_matches_version()
+                    # req.req is only avail after unpack for URL
+                    # pkgs repeat check_if_exists to uninstall-on-upgrade
+                    # (#14)
+                    if not ignore_installed:
+                        req.check_if_exists()
+                    if req.satisfied_by:
+                        if upgrade or ignore_installed:
+                            # don't uninstall conflict if user install and
+                            # conflict is not user install
+                            if not (use_user_site
+                                    and not dist_in_usersite(
+                                        req.satisfied_by)):
+                                req.conflicts_with = \
+                                    req.satisfied_by
+                            req.satisfied_by = None
+                        else:
+                            logger.info(
+                                'Requirement already satisfied (use '
+                                '--upgrade to upgrade): %s',
+                                req,
+                            )
+                            install = False
+
+    def install(self, argv):
+        """Install the package I represent, without dependencies."""
+        # TODO: Do we need other args? --install-dir, probably. Are they safe?
+        # Maybe it's your problem if you do unsafe things.
+        other_args = list(requirement_args(argv, want_other=True))
+        archive_path = join(self._temp_path, self._downloaded_filename())
+        run_pip(['install'] + other_args +  ['--no-deps', archive_path])
 
     @memoize
     def _actual_hash(self):
         """Download the package's archive if necessary, and return its hash."""
-        return hash_of_file(join(self.temp_path, self._download_filename()))
+        return hash_of_file(join(self._temp_path, self._downloaded_filename()))
 
     def _project_name(self):
         """Return the inner Requirement's "unsafe name".
@@ -762,43 +720,46 @@ def peep_install(argv):
     """
     output = []
     out = output.append
+    reqs = []
     try:
         req_paths = list(requirement_args(argv, want_paths=True))
         if not req_paths:
-            out("You have to specify one or more requirements files with the -r option, because\n")
-            out("otherwise there's nowhere for peep to look up the hashes.\n")
+            out("You have to specify one or more requirements files with the -r option, because\n"
+                "otherwise there's nowhere for peep to look up the hashes.\n")
             return COMMAND_LINE_ERROR
 
-        with ephemeral_dir() as temp_path:
-            # We're a "peep install" command, and we have some requirement paths.
-            reqs = chain.from_iterable(
-                parse_requirements(path, options=EmptyOptions())
-                for path in req_paths)
-            reqs = [DownloadedReq(req, temp_path) for req in reqs]
-            buckets = bucket(reqs, lambda r: r.__class__)
+        # We're a "peep install" command, and we have some requirement paths.
+        reqs = chain.from_iterable(
+            parse_requirements(path, options=EmptyOptions())
+            for path in req_paths)
+        reqs = [DownloadedReq(req, temp_path) for req in reqs]
+        buckets = bucket(reqs, lambda r: r.__class__)
 
-            # Skip a line after pip's "Cleaning up..." so the important stuff
-            # stands out:
-            if any(buckets[b] for b in ERROR_CLASSES):
-                out('\n')
+        # Skip a line after pip's "Cleaning up..." so the important stuff
+        # stands out:
+        if any(buckets[b] for b in ERROR_CLASSES):
+            out('\n')
 
-            printers = (lambda r: out(r.head()),
-                        lambda r: out(r.error() + '\n'),
-                        lambda r: out(r.foot()))
-            for c in ERROR_CLASSES:
-                first_every_last(buckets[c], *printers)
+        printers = (lambda r: out(r.head()),
+                    lambda r: out(r.error() + '\n'),
+                    lambda r: out(r.foot()))
+        for c in ERROR_CLASSES:
+            first_every_last(buckets[c], *printers)
 
-            if any(buckets[b] for b in ERROR_CLASSES):
-                out('-------------------------------\n')
-                out('Not proceeding to installation.\n')
-                return SOMETHING_WENT_WRONG
-            else:
-                pip_install_archives_from(temp_path, argv)
+        if any(buckets[b] for b in ERROR_CLASSES):
+            out('-------------------------------\n'
+                'Not proceeding to installation.\n')
+            return SOMETHING_WENT_WRONG
+        else:
+            for req in reqs:
+                req.install(argv)
 
-                first_every_last(buckets[SatisfiedReq], *printers)
+            first_every_last(buckets[SatisfiedReq], *printers)
 
         return ITS_FINE_ITS_FINE
     finally:
+        for req in reqs:
+            req.dispose()
         print(''.join(output))
 
 
