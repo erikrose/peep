@@ -11,16 +11,18 @@ hashes in requirements.txt, and you're all set.
 """
 from __future__ import print_function
 from base64 import urlsafe_b64encode
+import cgi
 from collections import defaultdict
 from functools import wraps
 from hashlib import sha256
 from itertools import chain
 from linecache import getline
+import mimetypes
 from optparse import OptionParser
 from os import listdir
 from os.path import join, basename, splitext
 import re
-from shutil import rmtree
+from shutil import rmtree, copy
 from sys import argv, exit
 from tempfile import mkdtemp
 try:
@@ -49,6 +51,9 @@ activate('pip>=0.6.2')  # Before 0.6.2, the log module wasn't there, so some
                         # much work to support even earlier, though.
 
 import pip
+from pip.commands.install import InstallCommand
+from pip.download import url_to_path
+from pip.index import PackageFinder
 from pip.log import logger
 from pip.req import parse_requirements
 
@@ -63,12 +68,18 @@ COMMAND_LINE_ERROR = 2
 
 ARCHIVE_EXTENSIONS = ('.tar.bz2', '.tar.gz', '.tgz', '.tar', '.zip')
 
+MARKER = object()
+
 
 class PipException(Exception):
     """When I delegated to pip, it exited with an error."""
 
     def __init__(self, error_code):
         self.error_code = error_code
+
+
+class UnsupportedRequirementError(Exception):
+    """An unsupported line was encountered in a requirements file."""
 
 
 def encoded_hash(sha):
@@ -85,7 +96,7 @@ def encoded_hash(sha):
 def run_pip(initial_args):
     """Delegate to pip the given args (starting with the subcommand), and raise
     ``PipException`` if something goes wrong."""
-    status_code = pip.main(initial_args=initial_args)
+    status_code = pip.main(initial_args)
 
     # Clear out the registrations in the pip "logger" singleton. Otherwise,
     # loggers keep getting appended to it with every run. Pip assumes only one
@@ -129,6 +140,7 @@ def filename_from_url(url):
 def requirement_args(argv, want_paths=False, want_other=False):
     """Return an iterable of filtered arguments.
 
+    :arg argv: Arguments, starting after the subcommand
     :arg want_paths: If True, the returned iterable includes the paths to any
         requirements files following a ``-r`` or ``--requirement`` option.
     :arg want_other: If True, the returned iterable includes the args that are
@@ -206,6 +218,155 @@ def memoize(func):
     return memoizer
 
 
+def package_finder(argv):
+    """Return a PackageFinder respecting command-line options.
+
+    :arg argv: Everything after the subcommand
+
+    """
+    # We instantiate an InstallCommand and then use some of its private
+    # machinery for our own purposes, like a virus. This approach is portable
+    # across many pip versions, where more fine-grained ones are not. Ignoring
+    # options that don't exist on the parser (for instance, --use-wheel) gives
+    # us a straightforward method of backward compatibility.
+    command = InstallCommand()
+    options, _ = command.parser.parse_args(argv)
+
+    # Carry over PackageFinder kwargs that have [about] the same names as
+    # options attr names:
+    possible_options = [
+        'find_links', 'use_wheel', 'allow_external', 'allow_unverified',
+        'allow_all_external', ('allow_all_prereleases', 'pre'),
+        'process_dependency_links']
+    kwargs = {}
+    for option in possible_options:
+        kw, attr = option if isinstance(option, tuple) else (option, option)
+        value = getattr(options, attr, MARKER)
+        if value is not MARKER:
+            kwargs[kw] = value
+
+    # Figure out index_urls:
+    index_urls = [options.index_url] + options.extra_index_urls
+    if options.no_index:
+        index_urls = []
+    if getattr(options, 'mirrors', []):
+        index_urls += options.mirrors
+
+    # If pip is new enough to have a PipSession, initialize one, since
+    # PackageFinder requires it:
+    if hasattr(command, '_build_session'):
+        kw['session'] = command._build_session(options)
+
+    return PackageFinder(index_urls=index_urls,
+                         **kwargs)
+
+
+# Ripped off from pip and gutted to remove progress indication and integrity
+# hash checking (which is just for transmission defects--different from peep's
+# local hash checking and, for peep's use case, redundant), which would have
+# pulled in further dependencies
+def download_url(resp, link, content_file):
+    def resp_read(chunk_size):
+        try:
+            # Special case for urllib3.
+            for chunk in resp.raw.stream(
+                    chunk_size,
+                    # We use decode_content=False here because we do not
+                    # want urllib3 to mess with the raw bytes we get
+                    # from the server. If we decompress inside of
+                    # urllib3 then we cannot verify the checksum
+                    # because the checksum will be of the compressed
+                    # file. This breakage will only occur if the
+                    # server adds a Content-Encoding header, which
+                    # depends on how the server was configured:
+                    # - Some servers will notice that the file isn't a
+                    #   compressible file and will leave the file alone
+                    #   and with an empty Content-Encoding
+                    # - Some servers will notice that the file is
+                    #   already compressed and will leave the file
+                    #   alone and will add a Content-Encoding: gzip
+                    #   header
+                    # - Some servers won't notice anything at all and
+                    #   will take a file that's already been compressed
+                    #   and compress it again and set the
+                    #   Content-Encoding: gzip header
+                    #
+                    # By setting this not to decode automatically we
+                    # hope to eliminate problems with the second case.
+                    decode_content=False):
+                yield chunk
+        except AttributeError:
+            # Standard file-like object.
+            while True:
+                chunk = resp.raw.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+
+    for chunk in resp_read(4096):
+        content_file.write(chunk)
+
+
+# Ripped off from pip
+def download_http_url(link, session, temp_dir):
+    """Download link url into temp_dir using provided session"""
+    target_url = link.url.split('#', 1)[0]
+    try:
+        resp = session.get(
+            target_url,
+            # We use Accept-Encoding: identity here because requests
+            # defaults to accepting compressed responses. This breaks in
+            # a variety of ways depending on how the server is configured.
+            # - Some servers will notice that the file isn't a compressible
+            #   file and will leave the file alone and with an empty
+            #   Content-Encoding
+            # - Some servers will notice that the file is already
+            #   compressed and will leave the file alone and will add a
+            #   Content-Encoding: gzip header
+            # - Some servers won't notice anything at all and will take
+            #   a file that's already been compressed and compress it again
+            #   and set the Content-Encoding: gzip header
+            # By setting this to request only the identity encoding We're
+            # hoping to eliminate the third case. Hopefully there does not
+            # exist a server which when given a file will notice it is
+            # already compressed and that you're not asking for a
+            # compressed file and will then decompress it before sending
+            # because if that's the case I don't think it'll ever be
+            # possible to make this work.
+            headers={"Accept-Encoding": "identity"},
+            stream=True,
+        )
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        logger.critical(
+            "HTTP error %s while getting %s", exc.response.status_code, link,
+        )
+        raise
+
+    content_type = resp.headers.get('content-type', '')
+    filename = link.filename  # fallback
+    # Have a look at the Content-Disposition header for a better guess
+    content_disposition = resp.headers.get('content-disposition')
+    if content_disposition:
+        type, params = cgi.parse_header(content_disposition)
+        # We use ``or`` here because we don't want to use an "empty" value
+        # from the filename param.
+        filename = params.get('filename') or filename
+    ext = splitext(filename)[1]
+    if not ext:
+        ext = mimetypes.guess_extension(content_type)
+        if ext:
+            filename += ext
+    if not ext and link.url != resp.url:
+        ext = os.path.splitext(resp.url)[1]
+        if ext:
+            filename += ext
+    file_path = os.path.join(temp_dir, filename)
+    with open(file_path, 'wb') as content_file:
+        download_url(resp, link, content_file)
+    return file_path, content_type
+
+
 class DownloadedReq(object):
     """A wrapper around InstallRequirement which offers additional information
     based on downloading and examining a corresponding package archive
@@ -214,14 +375,16 @@ class DownloadedReq(object):
     expensive things.
 
     """
-    def __init__(self, req):
+    def __init__(self, req, argv):
         """Download a requirement, compare its hashes, and return a subclass
         of DownloadedReq depending on its state.
 
         :arg req: The InstallRequirement I am based on
+        :arg argv: The args, starting after the subcommand
 
         """
-        self.req = req
+        self._req = req
+        self._argv = argv
 
         # We use a separate temp dir for each requirement so requirements
         # (from different indices) that happen to have the same archive names
@@ -287,7 +450,7 @@ class DownloadedReq(object):
         # If this is a github sha tarball, then it is always unsatisfied
         # because the url has a commit sha in it and not the version
         # number.
-        url = self.req.url
+        url = self._req.url
         if url:
             filename = filename_from_url(url)
             if filename.endswith(ARCHIVE_EXTENSIONS):
@@ -302,7 +465,7 @@ class DownloadedReq(object):
 
         """
         path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
-                      self.req.comes_from).groups())
+                      self._req.comes_from).groups())
         return path, int(line)
 
     @memoize  # Avoid hitting the file[cache] over and over.
@@ -330,239 +493,72 @@ class DownloadedReq(object):
     # Based on req_set.prepare_files() in pip bb2a8428d4aebc8d313d05d590f386fa3f0bbd0f
     @memoize  # Avoid re-downloading.
     def _downloaded_filename(self):
-        """Download the package's archive if necessary, and return its filename."""
-        # TODO: --no-deps (which my be implied in our changes to prepare_files()
-        # finder = PackageFinder(
-        #             find_links=options.find_links,
-        #             index_urls=index_urls,
-        #             use_wheel=options.use_wheel,
-        #             allow_external=options.allow_external,
-        #             allow_unverified=options.allow_unverified,
-        #             allow_all_external=options.allow_all_external,
-        #             allow_all_prereleases=options.pre,
-        #             process_dependency_links=options.process_dependency_links,
-        #             session=session,
-        #         )  # That's true in both wheel and non-wheel installs.
-        # dependency_links are okay; those are just additional web page URLs to check.
+        """Download the package's archive if necessary, and return its
+        filename.
+
+        --no-deps is implied, as we have reimplemented the bits that would
+        ordinarily do dependency resolution.
+
+        """
         # Maybe delete stuff that doesn't make any sense in a peep context, like things that deal with package upgrades (of already satisfied requirements), which shouldn't happen for ==-style requirements. I suspect our decisions about satisfiedness are already made by the time we hit this, by DownloadedReq.
-    #def prepare_files(req, finder, ignore_installed, editable, force_reinstall, upgrade, use_user_site, src_dir, build_dir, download_dir, wheel_download_dir, session):
-        # Based on is_download() from pip:
-        def download_dir_exists(download_dir):
-            """Return whether an existent download dir is given, and normalize it."""
-            if download_dir:
-                download_dir = os.path.expanduser(download_dir)
-                if os.path.exists(download_dir):
-                    return download_dir, True
+        # Peep doesn't support requirements it doesn't unpack because it can't hash them. Thus, it doesn't support editable requirements, because pip doesn't support editable requirements except for "local projects or a VCS url". Nor does it support VCS requirements yet, because it doesn't unpack them. In fact, all we support is == requirements and tarballs/zips/etc.
+        # TODO: Stop on reqs that are editable or aren't ==.
+
+        finder = package_finder(self._argv)
+
+        # If the requirement isn't already specified as a URL, get a URL
+        # from an index:
+        link = (finder.find_requirement(self._req, upgrade=False)
+                if self._req.url is None
+                else Link(self._req.url))
+
+        if link:
+            lower_scheme = link.scheme.lower()  # pip lower()s it for some reason.
+            if lower_scheme == 'http' or lower_scheme == 'https':
+                file_path, content_type = download_http_url(
+                        link, session, self._temp_path)
+                # TODO: Maybe report HTTPErrors more gracefully.
+                return basename(file_path)
+            elif lower_scheme == 'file':
+                # The following is inspired by pip's unpack_file_url():
+                link_path = url_to_path(link.url_without_fragment)
+                if isdir(link_path):
+                    raise UnsupportedRequirementError(
+                        "Peep supports only file:// URLs which point to "
+                        "files, not directories.")
                 else:
-                    logger.critical('Could not find download directory')
-                    raise InstallationError(
-                        "Could not find or access download directory '%s'"
-                        % display_path(download_dir))
-            return download_dir, False
-
-        download_dir, is_download = download_dir_exists(download_dir)
-
-        install = True
-        best_installed = False
-        not_found = None
-
-        # ############################################# #
-        # # Search for archive to fulfill requirement # #
-        # ############################################# #
-
-        if not ignore_installed and not req.editable:
-            req.check_if_exists()
-            if req.satisfied_by:
-    #                 if upgrade:
-    #                     if not force_reinstall and not req.url:
-    #                         try:
-    #                             url = finder.find_requirement(
-    #                                 req, upgrade)
-    #                         except BestVersionAlreadyInstalled:
-    #                             best_installed = True
-    #                             install = False
-    #                         except DistributionNotFound as exc:
-    #                             not_found = exc
-    #                         else:
-    #                             # Avoid the need to call find_requirement again
-    #                             req.url = url.url
-    #
-    #                     if not best_installed:
-    #                         # don't uninstall conflict if user install and
-    #                         # conflict is not user install
-    #                         if not (use_user_site
-    #                                 and not dist_in_usersite(
-    #                                     req.satisfied_by
-    #                                 )):
-    #                             req.conflicts_with = \
-    #                                 req.satisfied_by
-    #                         req.satisfied_by = None
-    #                 else:
-                    install = False
-            if req.satisfied_by:
-    #                 if best_installed:
-    #                     logger.info(
-    #                         'Requirement already up-to-date: %s',
-    #                         req,
-    #                     )
-    #                 else:
-    #                     logger.info(
-    #                         'Requirement already satisfied (use --upgrade to '
-    #                         'upgrade): %s',
-    #                         req,
-    #                     )
-        if req.editable:
-            logger.info('Obtaining %s', req)
-        elif install:
-            if (req.url
-                    and req.url.lower().startswith('file:')):
-                logger.info(
-                    'Unpacking %s',
-                    display_path(url_to_path(req.url)),
-                )
+                    copy(link_path, self._temp_path)
+                    return basename(link_path)
             else:
-                logger.info('Downloading/unpacking %s', req)
+                raise UnsupportedRequirementError(
+                    "Peep supports only requirements that result in a file "
+                    "that can be hashed: == requirements, file:// URLs "
+                    "pointing to files (not folders), and http:// and "
+                    "https:// URLs pointing to tarballs, zips, etc.")
+        else:
+            raise UnsupportedRequirementError(
+                "Peep couldn't figure out where to download the requirement "
+                "%s from." % (self._req,))
 
-        with indent_log():
-            # ################################ #
-            # # vcs update or unpack archive # #
-            # ################################ #
+                # All we probably need from here down (and maybe not even this) is to zip up any VCS-checked-out requirements so they can be pip installed later [Nope: we don't support that.]. We don't care about assert_source_matches_version() or .satisfied_by, because we ensure accuracy by comparing hashes externally, and we deal with satisfaction externally as well.
 
-            is_wheel = False
-            if req.editable:
-                if req.source_dir is None:
-                    location = req.build_location(src_dir)
-                    req.source_dir = location
-                else:
-                    location = req.source_dir
-                if not os.path.exists(build_dir):
-                    _make_build_dir(build_dir)
-                req.update_editable(not is_download)  # vcs checkouts and file:// URLs
-                if is_download:
-                    req.run_egg_info()  # HOLY CRAP DON'T DO THIS unless we can git fsck the download or something. Or maybe git against remote servers is trustworthy now: http://www.mythmon.com/posts/malicious-git-servers.html.
-                    req.archive(download_dir)
-                else:
-                    req.run_egg_info()  # HOLY CRAP DON'T DO THIS
-            elif install:
-                # @@ if filesystem packages are not marked
-                # editable in a req, a non deterministic error
-                # occurs when the script attempts to unpack the
-                # build directory
+# This might be a good way to get a VCS-independent hash on VCS checkouts:
+#                         if url and url.scheme in vcs.all_schemes:
+#                             req.archive(download_dir)
+# We could even make peep hash run on dirs.
 
-                # NB: This call can result in the creation of a temporary
-                # build directory
-                location = req.build_location(
-                    build_dir,
-                    not is_download,
-                )
-                unpack = True
-                url = None
 
-                # If a checkout exists, it's unwise to keep going.  version
-                # inconsistencies are logged later, but do not fail the
-                # installation.
-                if os.path.exists(os.path.join(location, 'setup.py')):
-                    raise PreviousBuildDirError(
-                        "pip can't proceed with requirements '%s' due to a"
-                        " pre-existing build directory (%s). This is "
-                        "likely due to a previous installation that failed"
-                        ". pip is being responsible and not assuming it "
-                        "can delete this. Please delete it and try again."
-                        % (req, location)
-                    )
-                else:
-                    # FIXME: this won't upgrade when there's an existing
-                    # package unpacked in `location`
-                    if req.url is None:
-                        if not_found:
-                            raise not_found
-                        url = finder.find_requirement(
-                            req,
-                            upgrade=upgrade,
-                        )
-                    else:
-                        # FIXME: should req.url already be a
-                        # link?
-                        url = Link(req.url)
-                        assert url
-                    if url:
-                        try:
+    def install(self):
+        """Install the package I represent, without dependencies.
 
-                            if (
-                                url.filename.endswith(wheel_ext)
-                                and wheel_download_dir
-                            ):
-                                # when doing 'pip wheel`
-                                download_dir = wheel_download_dir
-                                do_download = True
-                            else:
-                                download_dir = download_dir
-                                do_download = is_download
-                            unpack_url(
-                                url, location, download_dir,
-                                do_download, session=session,
-                            )
-                        except requests.HTTPError as exc:
-                            logger.critical(
-                                'Could not install requirement %s because '
-                                'of error %s',
-                                req,
-                                exc,
-                            )
-                            raise InstallationError(
-                                'Could not install requirement %s because '
-                                'of HTTP error %s for URL %s' %
-                                (req, exc, url)
-                            )
-                    else:
-                        unpack = False
-                # All we probably need from here down (and maybe not even this) is to zip up any VCS-checked-out requirements so they can be pip installed later. We don't care about assert_source_matches_version() or .satisfied_by, because we ensure accuracy by comparing hashes externally, and we deal with satisfaction externally as well.
-                if unpack:
-                    is_wheel = url and url.filename.endswith(wheel_ext)
-                    if is_download:
-                        req.source_dir = location
-                        if not is_wheel:
-                            # FIXME:https://github.com/pypa/pip/issues/1112
-                            req.run_egg_info()  # NOPE NOPE NOPE
-                        if url and url.scheme in vcs.all_schemes:
-                            req.archive(download_dir)
-                    elif is_wheel:
-                        req.source_dir = location
-                        req.url = url.url
-                    else:
-                        req.source_dir = location
-                        req.run_egg_info()  # NOPE
-                        req.assert_source_matches_version()
-                    # req.req is only avail after unpack for URL
-                    # pkgs repeat check_if_exists to uninstall-on-upgrade
-                    # (#14)
-                    if not ignore_installed:
-                        req.check_if_exists()
-                    if req.satisfied_by:
-                        if upgrade or ignore_installed:
-                            # don't uninstall conflict if user install and
-                            # conflict is not user install
-                            if not (use_user_site
-                                    and not dist_in_usersite(
-                                        req.satisfied_by)):
-                                req.conflicts_with = \
-                                    req.satisfied_by
-                            req.satisfied_by = None
-                        else:
-                            logger.info(
-                                'Requirement already satisfied (use '
-                                '--upgrade to upgrade): %s',
-                                req,
-                            )
-                            install = False
+        Obey typical pip-install options passed in on the command line.
 
-    def install(self, argv):
-        """Install the package I represent, without dependencies."""
+        """
         # TODO: Do we need other args? --install-dir, probably. Are they safe?
         # Maybe it's your problem if you do unsafe things.
-        other_args = list(requirement_args(argv, want_other=True))
+        other_args = list(requirement_args(self._argv, want_other=True))
         archive_path = join(self._temp_path, self._downloaded_filename())
-        run_pip(['install'] + other_args +  ['--no-deps', archive_path])
+        run_pip(['install'] + other_args + ['--no-deps', archive_path])
 
     @memoize
     def _actual_hash(self):
@@ -575,21 +571,21 @@ class DownloadedReq(object):
         Raise ValueError if there is no name.
 
         """
-        name = getattr(self.req.req, 'project_name', '')
+        name = getattr(self._req.req, 'project_name', '')
         if name:
             return name
         raise ValueError('Requirement has no project_name.')
 
     def _name(self):
-        return self.req.name
+        return self._req.name
 
     def _url(self):
-        return self.req.url
+        return self._req.url
 
     @memoize  # Avoid re-running expensive check_if_exists().
     def _is_satisfied(self):
-        self.req.check_if_exists()
-        return (self.req.satisfied_by and
+        self._req.check_if_exists()
+        return (self._req.satisfied_by and
                 not self._is_always_unsatisfied())
 
     def _class(self):
@@ -674,7 +670,7 @@ class SatisfiedReq(DownloadedReq):
                 "safe. If not, uninstall them, then re-attempt your install with peep.\n")
 
     def error(self):
-        return '   %s' % (self.req,)
+        return '   %s' % (self._req,)
 
 
 class InstallableReq(DownloadedReq):
@@ -732,7 +728,7 @@ def peep_install(argv):
         reqs = chain.from_iterable(
             parse_requirements(path, options=EmptyOptions())
             for path in req_paths)
-        reqs = [DownloadedReq(req, temp_path) for req in reqs]
+        reqs = [DownloadedReq(req, argv) for req in reqs]
         buckets = bucket(reqs, lambda r: r.__class__)
 
         # Skip a line after pip's "Cleaning up..." so the important stuff
@@ -751,8 +747,8 @@ def peep_install(argv):
                 'Not proceeding to installation.\n')
             return SOMETHING_WENT_WRONG
         else:
-            for req in reqs:
-                req.install(argv)
+            for req in buckets[InstallableReq]:
+                req.install()
 
             first_every_last(buckets[SatisfiedReq], *printers)
 
