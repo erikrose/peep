@@ -20,15 +20,17 @@ from linecache import getline
 import mimetypes
 from optparse import OptionParser
 from os import listdir
-from os.path import join, basename, splitext
+from os.path import join, basename, splitext, isdir
 import re
 from shutil import rmtree, copy
 from sys import argv, exit
 from tempfile import mkdtemp
+from urllib2 import build_opener, HTTPHandler, HTTPSHandler, HTTPError
 try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse  # 3.4
+# TODO: Probably use six to make urllib stuff work across 2/3.
 
 from pkg_resources import require, VersionConflict, DistributionNotFound
 
@@ -53,7 +55,7 @@ activate('pip>=0.6.2')  # Before 0.6.2, the log module wasn't there, so some
 import pip
 from pip.commands.install import InstallCommand
 from pip.download import url_to_path
-from pip.index import PackageFinder
+from pip.index import PackageFinder, Link
 from pip.log import logger
 from pip.req import parse_requirements
 
@@ -80,6 +82,15 @@ class PipException(Exception):
 
 class UnsupportedRequirementError(Exception):
     """An unsupported line was encountered in a requirements file."""
+
+
+class DownloadError(Exception):
+    def __init__(self, link, exc):
+        self.link = link
+        self.reason = str(exc)
+
+    def __str__(self):
+        return 'Downloading %s failed: %s' % (self.link, self.reason)
 
 
 def encoded_hash(sha):
@@ -261,112 +272,6 @@ def package_finder(argv):
                          **kwargs)
 
 
-# Ripped off from pip and gutted to remove progress indication and integrity
-# hash checking (which is just for transmission defects--different from peep's
-# local hash checking and, for peep's use case, redundant), which would have
-# pulled in further dependencies
-def download_url(resp, link, content_file):
-    def resp_read(chunk_size):
-        try:
-            # Special case for urllib3.
-            for chunk in resp.raw.stream(
-                    chunk_size,
-                    # We use decode_content=False here because we do not
-                    # want urllib3 to mess with the raw bytes we get
-                    # from the server. If we decompress inside of
-                    # urllib3 then we cannot verify the checksum
-                    # because the checksum will be of the compressed
-                    # file. This breakage will only occur if the
-                    # server adds a Content-Encoding header, which
-                    # depends on how the server was configured:
-                    # - Some servers will notice that the file isn't a
-                    #   compressible file and will leave the file alone
-                    #   and with an empty Content-Encoding
-                    # - Some servers will notice that the file is
-                    #   already compressed and will leave the file
-                    #   alone and will add a Content-Encoding: gzip
-                    #   header
-                    # - Some servers won't notice anything at all and
-                    #   will take a file that's already been compressed
-                    #   and compress it again and set the
-                    #   Content-Encoding: gzip header
-                    #
-                    # By setting this not to decode automatically we
-                    # hope to eliminate problems with the second case.
-                    decode_content=False):
-                yield chunk
-        except AttributeError:
-            # Standard file-like object.
-            while True:
-                chunk = resp.raw.read(chunk_size)
-                if not chunk:
-                    break
-                yield chunk
-
-    for chunk in resp_read(4096):
-        content_file.write(chunk)
-
-
-# Ripped off from pip
-def download_http_url(link, session, temp_dir):
-    """Download link url into temp_dir using provided session"""
-    target_url = link.url.split('#', 1)[0]
-    try:
-        resp = session.get(
-            target_url,
-            # We use Accept-Encoding: identity here because requests
-            # defaults to accepting compressed responses. This breaks in
-            # a variety of ways depending on how the server is configured.
-            # - Some servers will notice that the file isn't a compressible
-            #   file and will leave the file alone and with an empty
-            #   Content-Encoding
-            # - Some servers will notice that the file is already
-            #   compressed and will leave the file alone and will add a
-            #   Content-Encoding: gzip header
-            # - Some servers won't notice anything at all and will take
-            #   a file that's already been compressed and compress it again
-            #   and set the Content-Encoding: gzip header
-            # By setting this to request only the identity encoding We're
-            # hoping to eliminate the third case. Hopefully there does not
-            # exist a server which when given a file will notice it is
-            # already compressed and that you're not asking for a
-            # compressed file and will then decompress it before sending
-            # because if that's the case I don't think it'll ever be
-            # possible to make this work.
-            headers={"Accept-Encoding": "identity"},
-            stream=True,
-        )
-        resp.raise_for_status()
-    except requests.HTTPError as exc:
-        logger.critical(
-            "HTTP error %s while getting %s", exc.response.status_code, link,
-        )
-        raise
-
-    content_type = resp.headers.get('content-type', '')
-    filename = link.filename  # fallback
-    # Have a look at the Content-Disposition header for a better guess
-    content_disposition = resp.headers.get('content-disposition')
-    if content_disposition:
-        type, params = cgi.parse_header(content_disposition)
-        # We use ``or`` here because we don't want to use an "empty" value
-        # from the filename param.
-        filename = params.get('filename') or filename
-    ext = splitext(filename)[1]
-    if not ext:
-        ext = mimetypes.guess_extension(content_type)
-        if ext:
-            filename += ext
-    if not ext and link.url != resp.url:
-        ext = os.path.splitext(resp.url)[1]
-        if ext:
-            filename += ext
-    file_path = os.path.join(temp_dir, filename)
-    with open(file_path, 'wb') as content_file:
-        download_url(resp, link, content_file)
-    return file_path, content_type
-
-
 class DownloadedReq(object):
     """A wrapper around InstallRequirement which offers additional information
     based on downloading and examining a corresponding package archive
@@ -490,6 +395,77 @@ class DownloadedReq(object):
         hashes.reverse()  # because we read them backwards
         return hashes
 
+    def _download(self, link):
+        """Download a file, and return its name within my temp dir.
+
+        This does no verification of HTTPS certs, but our checking hashes
+        makes that largely unimportant. It would be nice to be able to use the
+        requests lib, which can verify certs, but it is guaranteed to be
+        available only in pip >= 1.5.
+
+        This also drops support for proxies and basic auth, though those could
+        be added back in.
+
+        """
+        # Based on pip 1.4.1's URLOpener but with cert verification removed
+        def opener(is_https):
+            if is_https:
+                opener = build_opener(HTTPSHandler())
+                # Strip out HTTPHandler to prevent MITM spoof:
+                for handler in opener.handlers:
+                    if isinstance(handler, HTTPHandler):
+                        opener.handlers.remove(handler)
+            else:
+                opener = build_opener()
+            return opener
+
+        # Descended from unpack_http_url() in pip 1.4.1
+        def best_filename(link, response):
+            """Return the most informative possible filename for a download,
+            ideally with a proper extension.
+
+            """
+            content_type = response.info().get('content-type', '')
+            filename = link.filename  # fallback
+            # Have a look at the Content-Disposition header for a better guess:
+            content_disposition = response.info().get('content-disposition')
+            if content_disposition:
+                type, params = cgi.parse_header(content_disposition)
+                # We use ``or`` here because we don't want to use an "empty" value
+                # from the filename param:
+                filename = params.get('filename') or filename
+            ext = splitext(filename)[1]
+            if not ext:
+                ext = mimetypes.guess_extension(content_type)
+                if ext:
+                    filename += ext
+            if not ext and link.url != response.geturl():
+                ext = splitext(response.geturl())[1]
+                if ext:
+                    filename += ext
+            return filename
+
+        # Descended from _download_url() in pip 1.4.1
+        def pipe_to_file(response, path):
+            """Pull the data off an HTTP response, and shove it in a new file."""
+            # TODO: Indicate progress.
+            with open(path, 'wb') as file:
+                while True:
+                    chunk = response.read(4096)
+                    if not chunk:
+                        break
+                    file.write(chunk)
+
+        url = link.url.split('#', 1)[0]
+        try:
+            response = opener(urlparse(url).scheme != 'http').open(url)
+        except (HTTPError, IOError) as exc:
+            raise DownloadError(link, exc)
+        filename = best_filename(link, response)
+        pipe_to_file(response, join(self._temp_path, filename))
+        return filename
+
+
     # Based on req_set.prepare_files() in pip bb2a8428d4aebc8d313d05d590f386fa3f0bbd0f
     @memoize  # Avoid re-downloading.
     def _downloaded_filename(self):
@@ -500,8 +476,14 @@ class DownloadedReq(object):
         ordinarily do dependency resolution.
 
         """
-        # Maybe delete stuff that doesn't make any sense in a peep context, like things that deal with package upgrades (of already satisfied requirements), which shouldn't happen for ==-style requirements. I suspect our decisions about satisfiedness are already made by the time we hit this, by DownloadedReq.
-        # Peep doesn't support requirements it doesn't unpack because it can't hash them. Thus, it doesn't support editable requirements, because pip doesn't support editable requirements except for "local projects or a VCS url". Nor does it support VCS requirements yet, because it doesn't unpack them. In fact, all we support is == requirements and tarballs/zips/etc.
+        # Peep doesn't support requirements it doesn't unpack because it can't
+        # hash them. Thus, it doesn't support editable requirements, because
+        # pip itself doesn't support editable requirements except for "local
+        # projects or a VCS url". Nor does it support VCS requirements yet,
+        # because we haven't yet come up with a portable, deterministic way to
+        # hash them. In summary, all we support is == requirements and
+        # tarballs/zips/etc.
+
         # TODO: Stop on reqs that are editable or aren't ==.
 
         finder = package_finder(self._argv)
@@ -515,30 +497,31 @@ class DownloadedReq(object):
         if link:
             lower_scheme = link.scheme.lower()  # pip lower()s it for some reason.
             if lower_scheme == 'http' or lower_scheme == 'https':
-                file_path, content_type = download_http_url(
-                        link, session, self._temp_path)
-                # TODO: Maybe report HTTPErrors more gracefully.
+                file_path = self._download(link)
                 return basename(file_path)
             elif lower_scheme == 'file':
                 # The following is inspired by pip's unpack_file_url():
                 link_path = url_to_path(link.url_without_fragment)
                 if isdir(link_path):
                     raise UnsupportedRequirementError(
-                        "Peep supports only file:// URLs which point to "
-                        "files, not directories.")
+                        "%s: %s is a directory. So that it can compute "
+                        "a hash, peep supports only filesystem paths which "
+                        "point to files" %
+                        (self._req, link.url_without_fragment))
                 else:
                     copy(link_path, self._temp_path)
                     return basename(link_path)
             else:
                 raise UnsupportedRequirementError(
-                    "Peep supports only requirements that result in a file "
-                    "that can be hashed: == requirements, file:// URLs "
-                    "pointing to files (not folders), and http:// and "
-                    "https:// URLs pointing to tarballs, zips, etc.")
+                    "%s: The download link, %s, would not result in a file "
+                    "that can be hashed. Peep supports only == requirements, "
+                    "file:// URLs pointing to files (not folders), and "
+                    "http:// and https:// URLs pointing to tarballs, zips, "
+                    "etc." % (self._req, link.url))
         else:
             raise UnsupportedRequirementError(
-                "Peep couldn't figure out where to download the requirement "
-                "%s from." % (self._req,))
+                "%s: couldn't determine where to download this requirement from."
+                % (self._req,))
 
                 # All we probably need from here down (and maybe not even this) is to zip up any VCS-checked-out requirements so they can be pip installed later [Nope: we don't support that.]. We don't care about assert_source_matches_version() or .satisfied_by, because we ensure accuracy by comparing hashes externally, and we deal with satisfaction externally as well.
 
@@ -554,8 +537,6 @@ class DownloadedReq(object):
         Obey typical pip-install options passed in on the command line.
 
         """
-        # TODO: Do we need other args? --install-dir, probably. Are they safe?
-        # Maybe it's your problem if you do unsafe things.
         other_args = list(requirement_args(self._argv, want_other=True))
         archive_path = join(self._temp_path, self._downloaded_filename())
         run_pip(['install'] + other_args + ['--no-deps', archive_path])
@@ -715,7 +696,8 @@ def peep_install(argv):
 
     """
     output = []
-    out = output.append
+    #out = output.append
+    out = print
     reqs = []
     try:
         req_paths = list(requirement_args(argv, want_paths=True))
@@ -753,6 +735,9 @@ def peep_install(argv):
             first_every_last(buckets[SatisfiedReq], *printers)
 
         return ITS_FINE_ITS_FINE
+    except (UnsupportedRequirementError, DownloadError) as exc:
+        out(str(exc))
+        return SOMETHING_WENT_WRONG
     finally:
         for req in reqs:
             req.dispose()
