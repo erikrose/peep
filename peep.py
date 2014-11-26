@@ -21,6 +21,7 @@ import mimetypes
 from optparse import OptionParser
 from os import listdir
 from os.path import join, basename, splitext, isdir
+from pickle import dumps, loads
 import re
 from shutil import rmtree, copy
 from sys import argv, exit
@@ -236,12 +237,19 @@ def package_finder(argv):
 
     """
     # We instantiate an InstallCommand and then use some of its private
-    # machinery for our own purposes, like a virus. This approach is portable
-    # across many pip versions, where more fine-grained ones are not. Ignoring
-    # options that don't exist on the parser (for instance, --use-wheel) gives
-    # us a straightforward method of backward compatibility.
+    # machinery--its arg parser--for our own purposes, like a virus. This
+    # approach is portable across many pip versions, where more fine-grained
+    # ones are not. Ignoring options that don't exist on the parser (for
+    # instance, --use-wheel) gives us a straightforward method of backward
+    # compatibility.
     command = InstallCommand()
-    options, _ = command.parser.parse_args(argv)
+    # The downside is that it essentially ruins the InstallCommand class for
+    # further use. Calling out to pip.main() within the same interpreter, for
+    # example, would result in arguments parsed this time turning up there.
+    # Thus, we deepcopy the arg parser so we don't trash its singletons. Of
+    # course, deepcopy doesn't work on these objects, because they contain
+    # uncopyable regex patterns, so we pickle and unpickle instead. Fun!
+    options, _ = loads(dumps(command.parser)).parse_args(argv)
 
     # Carry over PackageFinder kwargs that have [about] the same names as
     # options attr names:
@@ -476,13 +484,13 @@ class DownloadedReq(object):
         ordinarily do dependency resolution.
 
         """
-        # Peep doesn't support requirements it doesn't unpack because it can't
-        # hash them. Thus, it doesn't support editable requirements, because
-        # pip itself doesn't support editable requirements except for "local
-        # projects or a VCS url". Nor does it support VCS requirements yet,
-        # because we haven't yet come up with a portable, deterministic way to
-        # hash them. In summary, all we support is == requirements and
-        # tarballs/zips/etc.
+        # Peep doesn't support requirements that don't come down as a single
+        # file, because it can't hash them. Thus, it doesn't support editable
+        # requirements, because pip itself doesn't support editable
+        # requirements except for "local projects or a VCS url". Nor does it
+        # support VCS requirements yet, because we haven't yet come up with a
+        # portable, deterministic way to hash them. In summary, all we support
+        # is == requirements and tarballs/zips/etc.
 
         # TODO: Stop on reqs that are editable or aren't ==.
 
