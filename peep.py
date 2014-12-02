@@ -268,7 +268,7 @@ def package_finder(argv):
     index_urls = [options.index_url] + options.extra_index_urls
     if options.no_index:
         index_urls = []
-    index_urls += getattr(options, 'mirrors', []):
+    index_urls += getattr(options, 'mirrors', [])
 
     # If pip is new enough to have a PipSession, initialize one, since
     # PackageFinder requires it:
