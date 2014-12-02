@@ -133,7 +133,7 @@ def hash_of_file(path):
 
 def is_git_sha(text):
     """Return whether this is probably a git sha"""
-    # Handle both the full sha as well as the 7-character abbrviation
+    # Handle both the full sha as well as the 7-character abbreviation
     if len(text) in (40, 7):
         try:
             int(text, 16)
@@ -268,16 +268,14 @@ def package_finder(argv):
     index_urls = [options.index_url] + options.extra_index_urls
     if options.no_index:
         index_urls = []
-    if getattr(options, 'mirrors', []):
-        index_urls += options.mirrors
+    index_urls += getattr(options, 'mirrors', []):
 
     # If pip is new enough to have a PipSession, initialize one, since
     # PackageFinder requires it:
     if hasattr(command, '_build_session'):
         kw['session'] = command._build_session(options)
 
-    return PackageFinder(index_urls=index_urls,
-                         **kwargs)
+    return PackageFinder(index_urls=index_urls, **kwargs)
 
 
 class DownloadedReq(object):
@@ -305,6 +303,9 @@ class DownloadedReq(object):
         # latter is a hash mismatch, the former has already passed the
         # comparison, and the latter gets installed.
         self._temp_path = mkdtemp(prefix='peep-')
+        # Think of DownloadedReq as a one-shot state machine. It's an abstract
+        # class that ratchets forward to being one of its own subclasses,
+        # depending on its package status. Then it doesn't move again.
         self.__class__ = self._class()
 
     def dispose(self):
@@ -349,9 +350,10 @@ class DownloadedReq(object):
             raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
                                (filename, package_name))
 
-        return (version_of_wheel if self._downloaded_filename().endswith('.whl')
-                else version_of_archive)(self._downloaded_filename(),
-                                         self._project_name())
+        get_version =  (version_of_wheel
+                        if self._downloaded_filename().endswith('.whl')
+                        else version_of_archive)
+        return get_version(self._downloaded_filename(), self._project_name())
 
     def _is_always_unsatisfied(self):
         """Returns whether this requirement is always unsatisfied
@@ -531,14 +533,6 @@ class DownloadedReq(object):
                 "%s: couldn't determine where to download this requirement from."
                 % (self._req,))
 
-                # All we probably need from here down (and maybe not even this) is to zip up any VCS-checked-out requirements so they can be pip installed later [Nope: we don't support that.]. We don't care about assert_source_matches_version() or .satisfied_by, because we ensure accuracy by comparing hashes externally, and we deal with satisfaction externally as well.
-
-# This might be a good way to get a VCS-independent hash on VCS checkouts:
-#                         if url and url.scheme in vcs.all_schemes:
-#                             req.archive(download_dir)
-# We could even make peep hash run on dirs.
-
-
     def install(self):
         """Install the package I represent, without dependencies.
 
@@ -593,6 +587,10 @@ class DownloadedReq(object):
 
     @classmethod
     def foot(cls):
+        """Return the text to be printed once, after all of the errors from
+        classes of my type are printed.
+
+        """
         return ''
 
 
