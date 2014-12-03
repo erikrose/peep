@@ -698,6 +698,18 @@ def first_every_last(iterable, first, every, last):
         last(item)
 
 
+def downloaded_reqs_from_path(path, argv):
+    """Return a list of DownloadedReqs representing the requirements parsed
+    out of a given requirements file.
+
+    :arg path: The path to the requirements file
+    :arg argv: The commandline args, starting after the subcommand
+
+    """
+    return [DownloadedReq(req, argv) for req in
+            parse_requirements(path, options=EmptyOptions())]
+
+
 def peep_install(argv):
     """Perform the ``peep install`` subcommand, returning a shell status code
     or raising a PipException.
@@ -717,10 +729,9 @@ def peep_install(argv):
             return COMMAND_LINE_ERROR
 
         # We're a "peep install" command, and we have some requirement paths.
-        reqs = chain.from_iterable(
-            parse_requirements(path, options=EmptyOptions())
-            for path in req_paths)
-        reqs = [DownloadedReq(req, argv) for req in reqs]
+        reqs = list(chain.from_iterable(
+            downloaded_reqs_from_path(path, argv)
+            for path in req_paths))
         buckets = bucket(reqs, lambda r: r.__class__)
 
         # Skip a line after pip's "Cleaning up..." so the important stuff
