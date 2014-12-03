@@ -206,11 +206,12 @@ Version History
 2.0
   * Fix major security hole in which a package's setup.py would be executed
     after download, regardless of whether the package's archive matched a hash.
-    Specifically, stop relying on pip for package downloads, as it likes to
-    run setup.py to extract metadata. Implement our own downloading based on
-    the thing available everywhere, urllib2. As a result, HTTP proxies and
-    basic auth are not supported at the moment.
+    Specifically, stop relying on pip for downloading packages, as it likes to
+    run setup.py to extract metadata. Implement our own downloading using
+    what's available everywhere: urllib2. As a result, HTTP proxies and
+    basic auth are unsupported at the moment.
   * Refactor significantly for comprehensibility.
+  * Drastically improve test coverage.
   * Note that HTTPS certs are no longer checked. This shouldn't matter, given
     our hash checks.
 
