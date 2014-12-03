@@ -55,7 +55,13 @@ activate('pip>=0.6.2')  # Before 0.6.2, the log module wasn't there, so some
 
 import pip
 from pip.commands.install import InstallCommand
-from pip.download import url_to_path
+try:
+    from pip.download import url_to_path  # 1.5.6
+except ImportError:
+    try:
+        from pip.util import url_to_path  # 0.7.0
+    except ImportError:
+        from pip.util import url_to_filename as url_to_path  # 0.6.2
 from pip.index import PackageFinder, Link
 from pip.log import logger
 from pip.req import parse_requirements
