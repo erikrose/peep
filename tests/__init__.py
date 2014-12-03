@@ -1,15 +1,18 @@
 from contextlib import contextmanager
-from os import chdir, getcwd
-from os.path import dirname, join
+from functools import partial
+from os import curdir, pardir
+from os.path import dirname, join, split, splitdrive
 from shutil import rmtree
 from SimpleHTTPServer import SimpleHTTPRequestHandler
 import socket
 from SocketServer import TCPServer
 from pipes import quote
+from posixpath import normpath
 from subprocess import CalledProcessError, check_call
 from tempfile import mkdtemp
 from threading import Thread
 from unittest import TestCase
+from urllib import unquote
 
 from nose.tools import eq_, nottest
 
@@ -82,9 +85,40 @@ def peep_path():
     return join(dirname(tests_dir()), 'peep.py')
 
 
-class QuietRequestHandler(SimpleHTTPRequestHandler):
+class RequestHandler(SimpleHTTPRequestHandler):
+    """An HTTP request handler which is quiet and serves a specific folder."""
+
+    def __init__(self, *args, **kwargs):
+        self.root = kwargs.pop('root')  # required kwarg
+        SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
+
     def log_message(self, format, *args):
         """Don't log each request to the terminal."""
+
+    # Adapted from the implementation in the superclass
+    def translate_path(self, path):
+        """Translate a /-separated PATH to the local filename syntax, rooting
+        them at self.root.
+
+        Components that mean special things to the local file system
+        (e.g. drive or directory names) are ignored.  (XXX They should
+        probably be diagnosed.)
+
+        """
+        # abandon query parameters
+        path = path.split('?', 1)[0]
+        path = path.split('#', 1)[0]
+        path = normpath(unquote(path))
+        words = path.split('/')
+        words = filter(None, words)
+        path = self.root
+        for word in words:
+            drive, word = splitdrive(word)
+            head, word = split(word)
+            if word in (curdir, pardir):
+                continue
+            path = join(path, word)
+        return path
 
 
 class InstallTestCase(TestCase):
@@ -99,6 +133,29 @@ class InstallTestCase(TestCase):
             pass
 
 
+def server_and_port():
+    """Return an unstarted package server and the port it will use."""
+    # Find a port, and bind to it. I can't get the OS to close the socket
+    # promptly after we shut down the server, so we typically need to try
+    # a couple ports after the first test case. Setting
+    # TCPServer.allow_reuse_address = True seems to have nothing to do
+    # with this behavior.
+    worked = False
+    for port in xrange(8989, 8999):
+        try:
+            server = TCPServer(('localhost', port),
+                               partial(RequestHandler,
+                                       root=join(tests_dir(), 'packages')))
+        except socket.error:
+            pass
+        else:
+            worked = True
+            break
+    if not worked:
+        raise RuntimeError("Couldn't find a socket to use for a temporary index server.")
+    return server, port
+
+
 class ServerTestCase(InstallTestCase):
     """Tests which use an HTTP server serving a small, local index"""
 
@@ -106,29 +163,7 @@ class ServerTestCase(InstallTestCase):
     def setup_class(cls):
         """Spin up an HTTP server pointing at a small, local package index."""
         super(ServerTestCase, cls).setup_class()
-
-        cls.old_cwd = getcwd()
-        chdir(join(tests_dir(), 'packages'))  # for the HTTP server
-
-        # Find a port, and bind to it. I can't get the OS to close the socket
-        # promptly after we shut down the server, so we typically need to try
-        # a couple ports after the first test case. Setting
-        # TCPServer.allow_reuse_address = True seems to have nothing to do
-        # with this behavior.
-        worked = False
-        for port in xrange(8989, 8999):
-            cls.port = port
-            try:
-                cls.server = TCPServer(('localhost', cls.port),
-                                       QuietRequestHandler)
-            except socket.error:
-                pass
-            else:
-                worked = True
-                break
-        if not worked:
-            raise RuntimeError("Couldn't find a socket to use for a temporary index server.")
-
+        cls.server, cls.port = server_and_port()
         cls.thread = Thread(target=cls.server.serve_forever)
         cls.thread.start()
 
@@ -136,7 +171,6 @@ class ServerTestCase(InstallTestCase):
     def teardown_class(cls):
         cls.server.shutdown()
         cls.thread.join()
-        chdir(cls.old_cwd)
 
     @classmethod
     def index_url(cls):
@@ -264,3 +298,19 @@ class HashParsingTests(ServerTestCase):
             useless==1.0
             """)
         eq_(reqs[0]._expected_hashes(), ['trailing_space_should_be_stripped'])
+
+
+@nottest
+def run_test_server():
+    """Run an index server for testing manually against.
+
+    This is handy for chasing down failures.
+
+    """
+    server, port = server_and_port()
+    print "Serving the sample index at http://localhost:%s/" % port
+    server.serve_forever()
+
+
+if __name__ == '__main__':
+    run_test_server()
