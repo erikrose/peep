@@ -273,7 +273,7 @@ def package_finder(argv):
     # If pip is new enough to have a PipSession, initialize one, since
     # PackageFinder requires it:
     if hasattr(command, '_build_session'):
-        kw['session'] = command._build_session(options)
+        kwargs['session'] = command._build_session(options)
 
     return PackageFinder(index_urls=index_urls, **kwargs)
 
