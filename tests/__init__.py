@@ -6,7 +6,7 @@ from SimpleHTTPServer import SimpleHTTPRequestHandler
 import socket
 from SocketServer import TCPServer
 from pipes import quote
-from subprocess import CalledProcessError, check_output
+from subprocess import CalledProcessError, check_call
 from tempfile import mkdtemp
 from threading import Thread
 from unittest import TestCase
@@ -40,7 +40,9 @@ def requirements(contents):
 
 
 def run(command, **kwargs):
-    """Return the output of a command.
+    """Run and return the exit status of a command.
+
+    Raise CalledProcessError on error.
 
     Pass in any kind of shell-executable line you like, with one or more
     commands, pipes, etc. Any kwargs will be shell-escaped and then subbed into
@@ -57,7 +59,7 @@ def run(command, **kwargs):
     doesn't need to be read out of order, as with anonymous tokens.
 
     """
-    return check_output(
+    return check_call(
         command.format(**dict((k, quote(v)) for k, v in kwargs.iteritems())),
         shell=True)
 
@@ -151,8 +153,8 @@ class FullStackTests(ServerTestCase):
     """
     @classmethod
     def install_from_path(cls, reqs_path):
-        """Install from a requirements file using peep, and return the result
-        string.
+        """Install from a requirements file using peep, and return the exit
+        code.
 
         On failure, raise CalledProcessError.
 
@@ -165,13 +167,13 @@ class FullStackTests(ServerTestCase):
 
     def install_from_string(cls, reqs):
         """Install from a string of requirements using peep, and return the
-        result string.
+        exit code.
 
         On failure, raise CalledProcessError.
 
         """
         with requirements(reqs) as reqs_path:
-            cls.install_from_path(reqs_path)
+            return cls.install_from_path(reqs_path)
 
     def test_success(self):
         """If a hash matches, peep should do its work and exit happily."""
