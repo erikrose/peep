@@ -140,7 +140,7 @@ class ServerTestCase(InstallTestCase):
 
     @classmethod
     def index_url(cls):
-        return 'http://localhost:{}/'.format(cls.port)
+        return 'http://localhost:{port}/'.format(port=cls.port)
 
 
 class FullStackTests(ServerTestCase):
