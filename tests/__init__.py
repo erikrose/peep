@@ -199,6 +199,7 @@ class FullStackTests(ServerTestCase):
                    reqs=reqs_path,
                    local=cls.index_url())
 
+    @classmethod
     def install_from_string(cls, reqs):
         """Install from a string of requirements using peep, and return the
         exit code.
