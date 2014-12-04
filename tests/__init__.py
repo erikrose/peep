@@ -1,22 +1,32 @@
+from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
 from os import curdir, pardir
 from os.path import dirname, join, split, splitdrive
 from shutil import rmtree
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+try:
+    from SimpleHTTPServer import SimpleHTTPRequestHandler
+except ImportError:
+    from http.server import SimpleHTTPRequestHandler
 import socket
-from SocketServer import TCPServer
+try:
+    from SocketServer import TCPServer
+except ImportError:
+    from socketserver import TCPServer
 from pipes import quote
 from posixpath import normpath
 from subprocess import CalledProcessError, check_call
 from tempfile import mkdtemp
 from threading import Thread
 from unittest import TestCase
-from urllib import unquote
+try:
+    from urllib import unquote
+except ImportError:
+    from urllib.parse import unquote
 
 from nose.tools import eq_, nottest
 
-from peep import EmptyOptions, SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq
+from peep import EmptyOptions, SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange
 
 
 @contextmanager
@@ -63,7 +73,7 @@ def run(command, **kwargs):
 
     """
     return check_call(
-        command.format(**dict((k, quote(v)) for k, v in kwargs.iteritems())),
+        command.format(**dict((k, quote(v)) for k, v in kwargs.items())),
         shell=True)
 
 
@@ -313,7 +323,7 @@ def run_test_server():
 
     """
     server, port = server_and_port()
-    print "Serving the sample index at http://localhost:%s/" % port
+    print("Serving the sample index at http://localhost:%s/" % port)
     server.serve_forever()
 
 

@@ -10,6 +10,10 @@ hashes in requirements.txt, and you're all set.
 
 """
 from __future__ import print_function
+try:
+    xrange = xrange
+except NameError:
+    xrange = range
 from base64 import urlsafe_b64encode
 import cgi
 from collections import defaultdict
@@ -26,7 +30,11 @@ import re
 from shutil import rmtree, copy
 from sys import argv, exit
 from tempfile import mkdtemp
-from urllib2 import build_opener, HTTPHandler, HTTPSHandler, HTTPError
+try:
+    from urllib2 import build_opener, HTTPHandler, HTTPSHandler, HTTPError
+except ImportError:
+    from urllib.request import build_opener, HTTPHandler, HTTPSHandler
+    from urllib.error import HTTPError
 try:
     from urlparse import urlparse
 except ImportError:
