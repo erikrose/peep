@@ -89,6 +89,10 @@ class RequestHandler(SimpleHTTPRequestHandler):
     """An HTTP request handler which is quiet and serves a specific folder."""
 
     def __init__(self, *args, **kwargs):
+        """
+        :arg root: The path to the folder to serve
+
+        """
         self.root = kwargs.pop('root')  # required kwarg
         SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
 
@@ -122,7 +126,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
 
 class InstallTestCase(TestCase):
-    """Tests which actually try installing a package"""
+    """Support for tests which actually try installing a package"""
 
     @classmethod
     def setup_class(cls):
@@ -141,7 +145,7 @@ def server_and_port():
     # TCPServer.allow_reuse_address = True seems to have nothing to do
     # with this behavior.
     worked = False
-    for port in xrange(8989, 8999):
+    for port in xrange(8001, 8999):
         try:
             server = TCPServer(('localhost', port),
                                partial(RequestHandler,
@@ -157,7 +161,7 @@ def server_and_port():
 
 
 class ServerTestCase(InstallTestCase):
-    """Tests which use an HTTP server serving a small, local index"""
+    """Support for tests which use an HTTP server serving a small, local index"""
 
     @classmethod
     def setup_class(cls):
