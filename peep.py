@@ -252,7 +252,14 @@ def package_finder(argv):
     # ones are not. Ignoring options that don't exist on the parser (for
     # instance, --use-wheel) gives us a straightforward method of backward
     # compatibility.
-    command = InstallCommand()
+    try:
+        command = InstallCommand()
+    except TypeError:
+        # This is likely pip 1.3.0's "__init__() takes exactly 2 arguments (1
+        # given)" error. In that version, InstallCommand takes a top=level
+        # parser passed in from outside.
+        from pip.baseparser import create_main_parser
+        command = InstallCommand(create_main_parser())
     # The downside is that it essentially ruins the InstallCommand class for
     # further use. Calling out to pip.main() within the same interpreter, for
     # example, would result in arguments parsed this time turning up there.
