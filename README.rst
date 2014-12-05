@@ -208,8 +208,8 @@ Version History
     after download, regardless of whether the package's archive matched a hash.
     Specifically, stop relying on pip for downloading packages, as it likes to
     run setup.py to extract metadata. Implement our own downloading using
-    what's available everywhere: urllib2. As a result, HTTP proxies and
-    basic auth are unsupported at the moment.
+    what's available everywhere: urllib2. As a result, HTTP proxies,
+    basic auth, and ``--download-cache`` are unsupported at the moment.
   * Refactor significantly for comprehensibility.
   * Drastically improve test coverage.
   * Note that HTTPS certs are no longer checked. This shouldn't matter, given
