@@ -1,8 +1,8 @@
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
-from os import curdir, pardir
-from os.path import dirname, join, split, splitdrive
+from os import curdir, environ, pardir
+from os.path import dirname, isfile, join, split, splitdrive
 from shutil import rmtree
 try:
     from SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -224,33 +224,51 @@ class FullStackTests(ServerTestCase):
         with requirements(reqs) as reqs_path:
             return cls.install_from_path(reqs_path)
 
+    @contextmanager
+    def running_setup_py(self, should_run_it=True):
+        """Assert that setup.py did not run (or, if ``should_run_it`` is True,
+        that it did run).
+
+        To do so, we look for the presence of a telltale file that setup.py
+        creates.
+
+        """
+        with ephemeral_dir() as temp_dir:
+            telltale_path = join(temp_dir, 'telltale')
+            environ['PEEP_TEST_TELLTALE'] = telltale_path
+            yield
+            eq_(isfile(telltale_path), should_run_it)
+
     def test_success(self):
         """If a hash matches, peep should do its work and exit happily."""
-        self.install_from_string(
-            """# sha256: yy1CrBcHwIdIMUZGeg6blwoVuQ0bz8MnsPdhWxVoWFg
-            useless==1.0""")
+        with self.running_setup_py():
+            self.install_from_string(
+                """# sha256: f_y0x5sQfR1nj8HXuHStXojp_ihntAG-clNT2MNxF10
+                useless==1.0""")
         # No exception raised == happiness.
         run('pip uninstall -y useless')
 
     def test_mismatch(self):
         """If a hash doesn't match, peep should explode."""
-        try:
-            self.install_from_string(
-                """# sha256: badbadbad
-                useless==1.0""")
-        except CalledProcessError as exc:
-            eq_(exc.returncode, SOMETHING_WENT_WRONG)
-        else:
-            self.fail("Peep exited successfully but shouldn't have.")
+        with self.running_setup_py(False):
+            try:
+                self.install_from_string(
+                    """# sha256: badbadbad
+                    useless==1.0""")
+            except CalledProcessError as exc:
+                eq_(exc.returncode, SOMETHING_WENT_WRONG)
+            else:
+                self.fail("Peep exited successfully but shouldn't have.")
 
     def test_missing(self):
         """If a hash is missing, peep should explode."""
-        try:
-            self.install_from_string("""useless==1.0""")
-        except CalledProcessError as exc:
-            eq_(exc.returncode, SOMETHING_WENT_WRONG)
-        else:
-            self.fail("Peep exited successfully but shouldn't have.")
+        with self.running_setup_py(False):
+            try:
+                self.install_from_string("""useless==1.0""")
+            except CalledProcessError as exc:
+                eq_(exc.returncode, SOMETHING_WENT_WRONG)
+            else:
+                self.fail("Peep exited successfully but shouldn't have.")
 
 
 class HashParsingTests(ServerTestCase):
