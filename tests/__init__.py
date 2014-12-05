@@ -52,6 +52,22 @@ def requirements(contents):
         yield path
 
 
+@contextmanager
+def running_setup_py(should_run_it=True):
+    """Assert that setup.py did not run (or, if ``should_run_it`` is True,
+    that it did run).
+
+    To do so, we look for the presence of a telltale file that setup.py
+    creates.
+
+    """
+    with ephemeral_dir() as temp_dir:
+        telltale_path = join(temp_dir, 'telltale')
+        environ['PEEP_TEST_TELLTALE'] = telltale_path
+        yield
+        eq_(isfile(telltale_path), should_run_it)
+
+
 def run(command, **kwargs):
     """Run and return the exit status of a command.
 
@@ -224,24 +240,9 @@ class FullStackTests(ServerTestCase):
         with requirements(reqs) as reqs_path:
             return cls.install_from_path(reqs_path)
 
-    @contextmanager
-    def running_setup_py(self, should_run_it=True):
-        """Assert that setup.py did not run (or, if ``should_run_it`` is True,
-        that it did run).
-
-        To do so, we look for the presence of a telltale file that setup.py
-        creates.
-
-        """
-        with ephemeral_dir() as temp_dir:
-            telltale_path = join(temp_dir, 'telltale')
-            environ['PEEP_TEST_TELLTALE'] = telltale_path
-            yield
-            eq_(isfile(telltale_path), should_run_it)
-
     def test_success(self):
         """If a hash matches, peep should do its work and exit happily."""
-        with self.running_setup_py():
+        with running_setup_py():
             self.install_from_string(
                 """# sha256: f_y0x5sQfR1nj8HXuHStXojp_ihntAG-clNT2MNxF10
                 useless==1.0""")
@@ -250,7 +251,7 @@ class FullStackTests(ServerTestCase):
 
     def test_mismatch(self):
         """If a hash doesn't match, peep should explode."""
-        with self.running_setup_py(False):
+        with running_setup_py(False):
             try:
                 self.install_from_string(
                     """# sha256: badbadbad
@@ -262,7 +263,7 @@ class FullStackTests(ServerTestCase):
 
     def test_missing(self):
         """If a hash is missing, peep should explode."""
-        with self.running_setup_py(False):
+        with running_setup_py(False):
             try:
                 self.install_from_string("""useless==1.0""")
             except CalledProcessError as exc:
