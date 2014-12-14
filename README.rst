@@ -24,28 +24,6 @@ maintain, no enormous vendor libs to wrestle. Just ``requirements.txt`` with
 some funny-looking comments and peace of mind.
 
 
-Quick FAQ
-=========
-
-1. Peep guarantees repeatability.
-
-   If you ``peep install`` package x version y, every subsequent install of package
-   x version y will be the same as the original, or Peep will complain.
-
-2. Peep does not vet your packages.
-
-   Peep is not a substitute for vetting your packages. If you don't vet them,
-   then they are not vetted.
-
-3. Peep does not alleviate trust problems with authors or package indexes.
-
-   All peep does is guarantee that subsequent downloads of package x version y
-   are the same as the first one you did. It doesn't guarantee the author of
-   that package is trustworthy. It doesn't guarantee that the author of that
-   package released that package. It doesn't guarantee that the package index
-   is trustworthy.
-
-
 Switching to Peep
 =================
 
@@ -88,6 +66,40 @@ Switching to Peep
    original, compressed tarballs from PyPI.)
 4. In the future, always use ``peep install`` to install your requirements. You
    are now cryptographically safe!
+
+.. warning::
+
+    Be careful not to nullify all your work when you install your actual
+    project. If you use ``python setup.py install``, setuptools will happily go
+    out and download, unchecked, any requirements you missed in
+    ``requirements.txt`` (and it's easy to miss some as your project evolves).
+    One way to be safe is to pack up your project and then install that using
+    pip and ``--no-deps``::
+
+        python setup.py sdist
+        pip install --no-deps dist/yourproject-1.0.tar.gz
+
+
+Security Guarantees
+===================
+
+1. Peep guarantees repeatability.
+
+   If you ``peep install`` package x version y, every subsequent install of package
+   x version y will be the same as the original, or Peep will complain.
+
+2. Peep does not vet your packages.
+
+   Peep is not a substitute for vetting your packages. If you don't vet them,
+   then they are not vetted.
+
+3. Peep does not alleviate trust problems with authors or package indexes.
+
+   All peep does is guarantee that subsequent downloads of package x version y
+   are the same as the first one you did. It doesn't guarantee the author of
+   that package is trustworthy. It doesn't guarantee that the author of that
+   package released that package. It doesn't guarantee that the package index
+   is trustworthy.
 
 
 The Fearsome Warning
@@ -149,9 +161,6 @@ common.)
 Troubleshooting
 ===============
 
-Are you suddenly getting the Fearsome Warning? Maybe you're really in trouble,
-but maybe something more innocuous is happening.
-
 Upgrading wheels
 ----------------
 
@@ -167,16 +176,17 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Multiple Hashes: Architecture-Specific Packages and Old Versions of PyPI
 ------------------------------------------------------------------------
 
+Are you suddenly getting the Fearsome Warning? Maybe you're really in trouble,
+but maybe something more innocuous is happening.
+
 If your packages install from wheels or other potentially architecture-specific
 sources, their hashes will obviously differ across platforms. If you deploy on
 more than one, you'll need more than one hash.
 
-Also, a few packages offer downloads in multiple formats: for example, zips and
-tarballs. PyPI used to be unpredictable as to which it offered first, and pip
-simply takes the first one offered. Thus, if you're running an old version of
-PyPI internally or have some other Cheeseshop implementation which lacks a
-stable sort order, some packages may effectively have more than one valid hash
-for a given version.
+Also, some packages offer downloads in multiple formats: for example, zips and
+tarballs, or zips and wheels. Which version gets downloaded can vary based on
+your version of pip, meaning some packages may effectively have more than one
+valid hash.
 
 To support these scenarios, you can stack up multiple known-good hashes above a
 requirement, as long as they are within a contiguous block of commented lines::
