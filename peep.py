@@ -71,7 +71,10 @@ except ImportError:
     except ImportError:
         from pip.util import url_to_filename as url_to_path  # 0.6.2
 from pip.index import PackageFinder, Link
-from pip.log import logger
+try:
+    from pip.log import logger
+except ImportError:
+    from pip import logger  # https://github.com/pypa/pip/pull/2008
 from pip.req import parse_requirements
 
 
