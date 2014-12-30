@@ -76,7 +76,6 @@ try:
 except ImportError:
     from pip import logger  # https://github.com/pypa/pip/pull/2008
 from pip.req import parse_requirements
-from pip.download import PipSession
 
 
 __version__ = 2, 0, 0
@@ -732,9 +731,14 @@ def downloaded_reqs_from_path(path, argv):
     :arg argv: The commandline args, starting after the subcommand
 
     """
-    return [DownloadedReq(req, argv) for req in
-            parse_requirements(path, options=EmptyOptions(),
-                               session=PipSession())]
+    try:
+        return [DownloadedReq(req, argv) for req in
+                parse_requirements(path, options=EmptyOptions())]
+    except TypeError:
+        from pip.download import PipSession
+        return [DownloadedReq(req, argv) for req in
+                parse_requirements(path, options=EmptyOptions(),
+                                   session=PipSession())]
 
 
 def peep_install(argv):
