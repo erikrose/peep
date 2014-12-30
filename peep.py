@@ -74,7 +74,7 @@ from pip.index import PackageFinder, Link
 try:
     from pip.log import logger
 except ImportError:
-    from pip import logger  # https://github.com/pypa/pip/pull/2008
+    from pip import logger  # 6.0
 from pip.req import parse_requirements
 
 
@@ -735,6 +735,10 @@ def downloaded_reqs_from_path(path, argv):
         return [DownloadedReq(req, argv) for req in
                 parse_requirements(path, options=EmptyOptions())]
     except TypeError:
+        # session is a required kwarg as of pip 6.0 and will raise
+        # a TypeError if missing. It needs to be a PipSession instance,
+        # but in older versions we can't import it from pip.download
+        # (nor do we need it at all) so we only import it in this except block
         from pip.download import PipSession
         return [DownloadedReq(req, argv) for req in
                 parse_requirements(path, options=EmptyOptions(),
