@@ -27,6 +27,7 @@ from os import listdir
 from os.path import join, basename, splitext, isdir
 from pickle import dumps, loads
 import re
+import sys
 from shutil import rmtree, copy
 from sys import argv, exit
 from tempfile import mkdtemp
@@ -814,5 +815,31 @@ def main():
         return exc.error_code
 
 
+def exception_handler(exc_type, exc_value, exc_tb):
+    import traceback
+
+    print('Oh no! peep has thrown an error while trying to do stuff.')
+    print('Please write up a bug report with the specifics so that ')
+    print('we can fix it.')
+    print('')
+    print('https://github.com/erikrose/peep/issues')
+    print('')
+    print('Here is some information you can copy and paste into the ')
+    print('bug report:')
+    print('')
+    print('---')
+    print('peep:', repr(__version__))
+    print('python:', repr(sys.version))
+    print('pip:', repr(pip.__version__))
+    print('Command line: ', repr(sys.argv))
+    print(
+        ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+    print('---')
+
+
 if __name__ == '__main__':
-    exit(main())
+    try:
+        exit(main())
+    except Exception as exc:
+        exception_handler(*sys.exc_info())
+        exit(1)
