@@ -71,7 +71,10 @@ except ImportError:
     except ImportError:
         from pip.util import url_to_filename as url_to_path  # 0.6.2
 from pip.index import PackageFinder, Link
-from pip.log import logger
+try:
+    from pip.log import logger
+except ImportError:
+    from pip import logger  # 6.0
 from pip.req import parse_requirements
 
 
@@ -231,6 +234,7 @@ class EmptyOptions(object):
     """
     default_vcs = None
     skip_requirements_regex = None
+    isolated_mode = False
 
 
 def memoize(func):
@@ -727,8 +731,18 @@ def downloaded_reqs_from_path(path, argv):
     :arg argv: The commandline args, starting after the subcommand
 
     """
-    return [DownloadedReq(req, argv) for req in
-            parse_requirements(path, options=EmptyOptions())]
+    try:
+        return [DownloadedReq(req, argv) for req in
+                parse_requirements(path, options=EmptyOptions())]
+    except TypeError:
+        # session is a required kwarg as of pip 6.0 and will raise
+        # a TypeError if missing. It needs to be a PipSession instance,
+        # but in older versions we can't import it from pip.download
+        # (nor do we need it at all) so we only import it in this except block
+        from pip.download import PipSession
+        return [DownloadedReq(req, argv) for req in
+                parse_requirements(path, options=EmptyOptions(),
+                                   session=PipSession())]
 
 
 def peep_install(argv):
