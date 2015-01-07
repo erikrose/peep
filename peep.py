@@ -837,6 +837,6 @@ def exception_handler(exc_type, exc_value, exc_tb):
 if __name__ == '__main__':
     try:
         exit(main())
-    except Exception as exc:
+    except Exception:
         exception_handler(*sys.exc_info())
         exit(1)
