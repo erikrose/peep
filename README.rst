@@ -213,6 +213,11 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+2.1
+  * Support pip 6.x.
+  * Make error reporting friendly, emitting a bug reporting URL and
+    environment info along with the traceback.
+
 2.0
   * Fix major security hole in which a package's setup.py would be executed
     after download, regardless of whether the package's archive matched a hash.

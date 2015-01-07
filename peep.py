@@ -80,7 +80,7 @@ except ImportError:
 from pip.req import parse_requirements
 
 
-__version__ = 2, 0, 0
+__version__ = 2, 1, 0
 
 
 ITS_FINE_ITS_FINE = 0
