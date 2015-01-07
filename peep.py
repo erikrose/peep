@@ -31,6 +31,7 @@ import sys
 from shutil import rmtree, copy
 from sys import argv, exit
 from tempfile import mkdtemp
+import traceback
 try:
     from urllib2 import build_opener, HTTPHandler, HTTPSHandler, HTTPError
 except ImportError:
@@ -816,17 +817,13 @@ def main():
 
 
 def exception_handler(exc_type, exc_value, exc_tb):
-    import traceback
-
-    print('Oh no! peep has thrown an error while trying to do stuff.')
-    print('Please write up a bug report with the specifics so that ')
-    print('we can fix it.')
-    print('')
-    print('https://github.com/erikrose/peep/issues')
-    print('')
-    print('Here is some information you can copy and paste into the ')
-    print('bug report:')
-    print('')
+    print('Oh no! Peep had a problem while trying to do stuff. Please write up a bug report')
+    print('with the specifics so we can fix it:')
+    print()
+    print('https://github.com/erikrose/peep/issues/new')
+    print()
+    print('Here are some particulars you can copy and paste into the bug report:')
+    print()
     print('---')
     print('peep:', repr(__version__))
     print('python:', repr(sys.version))
