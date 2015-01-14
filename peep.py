@@ -733,17 +733,20 @@ def downloaded_reqs_from_path(path, argv):
     :arg argv: The commandline args, starting after the subcommand
 
     """
+    def downloaded_reqs(parsed_reqs):
+        """Just avoid repeating this list comp."""
+        return [DownloadedReq(req, argv) for req in parsed_reqs]
+
     try:
-        requirements = parse_requirements(path, options=EmptyOptions())
+        return downloaded_reqs(parse_requirements(path, options=EmptyOptions()))
     except TypeError:
         # session is a required kwarg as of pip 6.0 and will raise
         # a TypeError if missing. It needs to be a PipSession instance,
         # but in older versions we can't import it from pip.download
         # (nor do we need it at all) so we only import it in this except block
         from pip.download import PipSession
-        requirements = parse_requirements(
-                path, options=EmptyOptions(), session=PipSession())
-    return [DownloadedReq(req, argv) for req in requirements]
+        return downloaded_reqs(parse_requirements(
+                path, options=EmptyOptions(), session=PipSession()))
 
 
 def peep_install(argv):
