@@ -841,4 +841,4 @@ if __name__ == '__main__':
         exit(main())
     except Exception:
         exception_handler(*sys.exc_info())
-        exit(1)
+        exit(SOMETHING_WENT_WRONG)
