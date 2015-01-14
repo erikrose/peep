@@ -381,9 +381,9 @@ class DownloadedReq(object):
             raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
                                (filename, package_name))
 
-        get_version =  (version_of_wheel
-                        if self._downloaded_filename().endswith('.whl')
-                        else version_of_archive)
+        get_version = (version_of_wheel
+                       if self._downloaded_filename().endswith('.whl')
+                       else version_of_archive)
         return get_version(self._downloaded_filename(), self._project_name())
 
     def _is_always_unsatisfied(self):
