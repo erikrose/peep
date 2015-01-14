@@ -230,7 +230,7 @@ def peep_hash(argv):
 class EmptyOptions(object):
     """Fake optparse options for compatibility with pip<1.2
 
-    pip<1.2 had a bug in parse_requirments() in which the ``options`` kwarg
+    pip<1.2 had a bug in parse_requirements() in which the ``options`` kwarg
     was required. We work around that by passing it a mock object.
 
     """
@@ -734,17 +734,16 @@ def downloaded_reqs_from_path(path, argv):
 
     """
     try:
-        return [DownloadedReq(req, argv) for req in
-                parse_requirements(path, options=EmptyOptions())]
+        requirements = parse_requirements(path, options=EmptyOptions())
     except TypeError:
         # session is a required kwarg as of pip 6.0 and will raise
         # a TypeError if missing. It needs to be a PipSession instance,
         # but in older versions we can't import it from pip.download
         # (nor do we need it at all) so we only import it in this except block
         from pip.download import PipSession
-        return [DownloadedReq(req, argv) for req in
-                parse_requirements(path, options=EmptyOptions(),
-                                   session=PipSession())]
+        requirements = parse_requirements(
+                path, options=EmptyOptions(), session=PipSession())
+    return [DownloadedReq(req, argv) for req in requirements]
 
 
 def peep_install(argv):
