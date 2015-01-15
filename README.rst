@@ -216,6 +216,7 @@ Version History
 2.1.1
   * Fix bug in which peep would not upgrade a package expressed in terms of a
     GitHub-dwelling zip file if its version had not changed.
+  * Add tests against pip 6.0.4, 6.0.5, and 6.0.6 to the tox config.
 
 2.1
   * Support pip 6.x.
