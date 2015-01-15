@@ -54,8 +54,8 @@ def requirements(contents):
 
 @contextmanager
 def running_setup_py(should_run_it=True):
-    """Assert that setup.py did not run (or, if ``should_run_it`` is True,
-    that it did run).
+    """Assert that setup.py ran (or, if ``should_run_it`` is False, that it
+    did not run).
 
     To do so, we look for the presence of a telltale file that setup.py
     creates.
@@ -328,7 +328,7 @@ class HashParsingTests(ServerTestCase):
     def test_whitespace_stripping(self):
         """Make sure trailing whitespace is stripped from hashes."""
         reqs = self.downloaded_reqs("""
-            # sha256: trailing_space_should_be_stripped   
+            # sha256: trailing_space_should_be_stripped""" '   ' """
             useless==1.0
             """)
         eq_(reqs[0]._expected_hashes(), ['trailing_space_should_be_stripped'])
