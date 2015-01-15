@@ -213,6 +213,10 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+2.1.1
+  * Fix bug in which peep would not upgrade a package expressed in terms of a
+    GitHub-dwelling zip file if its version had not changed.
+
 2.1
   * Support pip 6.x.
   * Make error reporting friendly, emitting a bug reporting URL and

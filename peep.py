@@ -572,7 +572,10 @@ class DownloadedReq(object):
         """
         other_args = list(requirement_args(self._argv, want_other=True))
         archive_path = join(self._temp_path, self._downloaded_filename())
-        run_pip(['install'] + other_args + ['--no-deps', archive_path])
+        # -U so it installs whether pip deems the requirement "satisfied" or
+        # not. This is necessary for GitHub-sourced zips, which change without
+        # their version numbers changing.
+        run_pip(['install'] + other_args + ['--no-deps', '-U', archive_path])
 
     @memoize
     def _actual_hash(self):

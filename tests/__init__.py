@@ -1,6 +1,10 @@
 from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
+try:
+    from imp import reload  # Python 3
+except ImportError:
+    pass
 from os import curdir, environ, pardir
 from os.path import dirname, isfile, join, split, splitdrive
 from shutil import rmtree
@@ -24,9 +28,10 @@ try:
 except ImportError:
     from urllib.parse import unquote
 
+from nose import SkipTest
 from nose.tools import eq_, nottest
 
-from peep import EmptyOptions, SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange
+from peep import EmptyOptions, SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange, activate
 
 
 @contextmanager
@@ -53,12 +58,16 @@ def requirements(contents):
 
 
 @contextmanager
-def running_setup_py(should_run_it=True):
+def running_setup_py(should_run_it=True, should_make_sure_did_not_upgrade=False):
     """Assert that setup.py ran (or, if ``should_run_it`` is False, that it
     did not run).
 
     To do so, we look for the presence of a telltale file that setup.py
     creates.
+
+    :arg should_run_it: Whether the setup.py should have been run
+    :arg should_make_sure_did_not_upgrade: If True, we further assert that
+        useless 1.0, not 2.0, was installed.
 
     """
     with ephemeral_dir() as temp_dir:
@@ -66,6 +75,10 @@ def running_setup_py(should_run_it=True):
         environ['PEEP_TEST_TELLTALE'] = telltale_path
         yield
         eq_(isfile(telltale_path), should_run_it)
+        if should_make_sure_did_not_upgrade:
+            with open(telltale_path) as file:
+                # The 1.0 package says "oh no!". 2.0 says something else.
+                eq_(file.read(), 'oh no!')
 
 
 def run(command, **kwargs):
@@ -241,8 +254,13 @@ class FullStackTests(ServerTestCase):
             return cls.install_from_path(reqs_path)
 
     def test_success(self):
-        """If a hash matches, peep should do its work and exit happily."""
-        with running_setup_py():
+        """If a hash matches, peep should do its work and exit happily.
+
+        Also, the -U we pass to pip should not cause it to hit the index and
+        download a newer version of the package whose archive we passed it.
+
+        """
+        with running_setup_py(should_make_sure_did_not_upgrade=True):
             self.install_from_string(
                 """# sha256: f_y0x5sQfR1nj8HXuHStXojp_ihntAG-clNT2MNxF10
                 useless==1.0""")
@@ -270,6 +288,38 @@ class FullStackTests(ServerTestCase):
                 eq_(exc.returncode, SOMETHING_WENT_WRONG)
             else:
                 self.fail("Peep exited successfully but shouldn't have.")
+
+    def test_upgrade(self):
+        """Make sure peep installing a GitHub-sourced tarball installs it,
+        even if its version hasn't changed.
+
+        """
+        try:
+            activate('pip>=1.0.1')
+        except RuntimeError:
+            raise SkipTest("This version of pip is so old that #egg= parsing "
+                           "doesn't work right.")
+        # Install an old version:
+        self.install_from_string(
+            """# sha256: Q7PVYWdV3NFZ3bkx5bNmUd74UTCe7jrwf2AeM4wUD1A
+            {index_url}useless/1234567.zip#egg=useless""".format(
+                index_url=self.index_url()))
+        # Make sure it worked:
+        import useless
+        reload(useless)  # in case another test imports it first
+        eq_(useless.git_hash, '1234567')
+
+        # Install the new version:
+        self.install_from_string(
+           """# sha256: JIAjkT1OSM1PIxLbvKk46W4iOTqH9yHASHTwvGVEC4k
+            {index_url}useless/789abcd.zip#egg=useless""".format(
+                index_url=self.index_url()))
+        # Make sure the new version is really installed:
+        reload(useless)
+        eq_(useless.git_hash, '789abcd')
+
+        # Clean up:
+        run('pip uninstall -y useless')
 
 
 class HashParsingTests(ServerTestCase):
