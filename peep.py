@@ -80,7 +80,7 @@ except ImportError:
 from pip.req import parse_requirements
 
 
-__version__ = 2, 1, 1
+__version__ = 2, 1, 2
 
 
 ITS_FINE_ITS_FINE = 0
@@ -722,6 +722,7 @@ def first_every_last(iterable, first, every, last):
     did_first = False
     for item in iterable:
         if not did_first:
+            did_first = True
             first(item)
         every(item)
     if did_first:
