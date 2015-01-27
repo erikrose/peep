@@ -317,7 +317,7 @@ class DownloadedReq(object):
     expensive things.
 
     """
-    def __init__(self, req, argv):
+    def __init__(self, req, argv, finder):
         """Download a requirement, compare its hashes, and return a subclass
         of DownloadedReq depending on its state.
 
@@ -327,6 +327,8 @@ class DownloadedReq(object):
         """
         self._req = req
         self._argv = argv
+        self._finder = finder
+
 
         # We use a separate temp dir for each requirement so requirements
         # (from different indices) that happen to have the same archive names
@@ -527,11 +529,9 @@ class DownloadedReq(object):
 
         # TODO: Stop on reqs that are editable or aren't ==.
 
-        finder = package_finder(self._argv)
-
         # If the requirement isn't already specified as a URL, get a URL
         # from an index:
-        link = (finder.find_requirement(self._req, upgrade=False)
+        link = (self._finder.find_requirement(self._req, upgrade=False)
                 if self._req.url is None
                 else Link(self._req.url))
 
@@ -736,12 +736,15 @@ def downloaded_reqs_from_path(path, argv):
     :arg argv: The commandline args, starting after the subcommand
 
     """
+    finder = package_finder(argv)
+
     def downloaded_reqs(parsed_reqs):
         """Just avoid repeating this list comp."""
-        return [DownloadedReq(req, argv) for req in parsed_reqs]
+        return [DownloadedReq(req, argv, finder) for req in parsed_reqs]
 
     try:
-        return downloaded_reqs(parse_requirements(path, options=EmptyOptions()))
+        return downloaded_reqs(parse_requirements(
+            path, options=EmptyOptions(), finder=finder))
     except TypeError:
         # session is a required kwarg as of pip 6.0 and will raise
         # a TypeError if missing. It needs to be a PipSession instance,
@@ -749,7 +752,7 @@ def downloaded_reqs_from_path(path, argv):
         # (nor do we need it at all) so we only import it in this except block
         from pip.download import PipSession
         return downloaded_reqs(parse_requirements(
-                path, options=EmptyOptions(), session=PipSession()))
+            path, options=EmptyOptions(), session=PipSession(), finder=finder))
 
 
 def peep_install(argv):
