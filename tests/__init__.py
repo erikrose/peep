@@ -274,7 +274,7 @@ class FullStackTests(ServerTestCase):
         On failure, raise CalledProcessError.
 
         """
-        index = "-i {}".format(index or cls.index_url())
+        index = "-i {0}".format(index or cls.index_url())
         with requirements("\n".join([index, reqs])) as reqs_path:
             return cls.install_from_path_no_index(reqs_path)
 
