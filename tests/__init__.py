@@ -243,6 +243,19 @@ class FullStackTests(ServerTestCase):
                    local=cls.index_url())
 
     @classmethod
+    def install_from_path_no_index(cls, reqs_path):
+        """Install from a requirements file using peep, and return the exit
+        code. Uses the '--no-index' argument to disable the default index.
+
+        On failure, raise CalledProcessError.
+
+        """
+        return run('{python} {peep} install -r {reqs} --no-index',
+                   python=python_path(),
+                   peep=peep_path(),
+                   reqs=reqs_path)
+
+    @classmethod
     def install_from_string(cls, reqs):
         """Install from a string of requirements using peep, and return the
         exit code.
@@ -253,6 +266,18 @@ class FullStackTests(ServerTestCase):
         with requirements(reqs) as reqs_path:
             return cls.install_from_path(reqs_path)
 
+    @classmethod
+    def install_from_string_with_index(cls, reqs, index=None):
+        """Install from a string of requirements using peep, enabling a
+        custom index url, and return the exit code.
+
+        On failure, raise CalledProcessError.
+
+        """
+        index = "-i {}".format(index or cls.index_url())
+        with requirements("\n".join([index, reqs])) as reqs_path:
+            return cls.install_from_path_no_index(reqs_path)
+
     def test_success(self):
         """If a hash matches, peep should do its work and exit happily.
 
@@ -262,6 +287,16 @@ class FullStackTests(ServerTestCase):
         """
         with running_setup_py(should_make_sure_did_not_upgrade=True):
             self.install_from_string(
+                """# sha256: f_y0x5sQfR1nj8HXuHStXojp_ihntAG-clNT2MNxF10
+                useless==1.0""")
+        # No exception raised == happiness.
+        run('pip uninstall -y useless')
+
+    def test_success_req_index(self):
+        """Like test_success but with index argument in requirements.
+        """
+        with running_setup_py(should_make_sure_did_not_upgrade=True):
+            self.install_from_string_with_index(
                 """# sha256: f_y0x5sQfR1nj8HXuHStXojp_ihntAG-clNT2MNxF10
                 useless==1.0""")
         # No exception raised == happiness.
