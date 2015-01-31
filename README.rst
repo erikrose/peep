@@ -213,6 +213,11 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+2.2
+  * Add progress indication while downloading. Used with pip 6.0 and above, we
+    show a nice progress bar. Before that, we just mention the packages as we
+    download them.
+
 2.1.2
   * Get rid of repetition of explanatory messages at the end of a run when one
     applies to multiple packages.
