@@ -793,8 +793,7 @@ def peep_install(argv):
 
     """
     output = []
-    #out = output.append
-    out = print
+    out = output.append
     reqs = []
     try:
         req_paths = list(requirement_args(argv, want_paths=True))
