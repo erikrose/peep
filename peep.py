@@ -706,8 +706,6 @@ class MissingReq(DownloadedReq):
     def error(self):
         if self._url():
             line = self._url()
-            if self._name() not in filename_from_url(self._url()):
-                line = '%s#egg=%s' % (line, self._name())
         else:
             line = '%s==%s' % (self._name(), self._version())
         return '# sha256: %s\n%s\n' % (self._actual_hash(), line)
