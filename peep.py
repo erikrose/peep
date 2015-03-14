@@ -35,7 +35,6 @@ from itertools import chain
 from linecache import getline
 import mimetypes
 from optparse import OptionParser
-from os import listdir
 from os.path import join, basename, splitext, isdir
 from pickle import dumps, loads
 import re

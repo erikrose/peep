@@ -31,7 +31,7 @@ except ImportError:
 from nose import SkipTest
 from nose.tools import eq_, nottest
 
-from peep import EmptyOptions, SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange, activate
+from peep import SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange, activate
 
 
 @contextmanager
