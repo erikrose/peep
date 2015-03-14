@@ -3,7 +3,7 @@ import sys
 # Prevent spurious errors during `python setup.py test`, a la
 # http://www.eby-sarna.com/pipermail/peak/2010-May/003357.html:
 try:
-    import multiprocessing
+    import multiprocessing  # noqa
 except ImportError:
     pass
 
@@ -22,7 +22,7 @@ setup(
     entry_points={
         'console_scripts': ['peep = peep:main',
                             'peep-%s.%s = peep:main' % sys.version_info[:2]]
-        },
+    },
     url='https://github.com/erikrose/peep',
     include_package_data=True,
     # No dependencies are declared for peep, even though it requires pip.
@@ -44,7 +44,7 @@ setup(
         'Topic :: Software Development :: Build Tools',
         'Topic :: System :: Installation/Setup',
         'Topic :: System :: Systems Administration'
-        ],
+    ],
     keywords=['pip', 'secure', 'repeatable', 'deploy', 'deployment', 'hash',
               'install', 'installer']
 )
