@@ -715,14 +715,14 @@ class MismatchedReq(DownloadedReq):
                 "freak out, because someone has tampered with the packages.\n\n")
 
     def error(self):
-        preamble = '    %s: expected%s' % (
-            self._project_name(),
-            ' one of' if len(self._expected_hashes()) > 1 else '')
-        return '%s %s\n%s got %s' % (
-            preamble,
-            ('\n' + ' ' * (len(preamble) + 1)).join(self._expected_hashes()),
-            ' ' * (len(preamble) - 4),
-            self._actual_hash())
+        preamble = '    %s: expected' % self._project_name()
+        if len(self._expected_hashes()) > 1:
+            preamble += ' one of'
+        padding = '\n' + ' ' * (len(preamble) + 1)
+        return '%s %s\n%s got %s' % (preamble,
+                                     padding.join(self._expected_hashes()),
+                                     ' ' * (len(preamble) - 4),
+                                     self._actual_hash())
 
     @classmethod
     def foot(cls):
