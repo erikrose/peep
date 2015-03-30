@@ -35,7 +35,6 @@ from itertools import chain
 from linecache import getline
 import mimetypes
 from optparse import OptionParser
-from os import listdir
 from os.path import join, basename, splitext, isdir
 from pickle import dumps, loads
 import re
@@ -61,6 +60,8 @@ from pkg_resources import require, VersionConflict, DistributionNotFound
 # say `pip install peep.tar.gz` and thus pull down an untrusted copy of pip
 # from PyPI. Instead, we make sure it's installed and new enough here and spit
 # out an error message if not:
+
+
 def activate(specifier):
     """Make a compatible version of pip importable. Raise a RuntimeError if we
     couldn't."""
@@ -71,9 +72,10 @@ def activate(specifier):
         raise RuntimeError('The installed version of pip is too old; peep '
                            'requires ' + specifier)
 
-activate('pip>=0.6.2')  # Before 0.6.2, the log module wasn't there, so some
-                        # of our monkeypatching fails. It probably wouldn't be
-                        # much work to support even earlier, though.
+# Before 0.6.2, the log module wasn't there, so some
+# of our monkeypatching fails. It probably wouldn't be
+# much work to support even earlier, though.
+activate('pip>=0.6.2')
 
 import pip
 from pip.commands.install import InstallCommand
@@ -225,7 +227,8 @@ HASH_COMMENT_RE = re.compile(
                                #   just trailing whitespace if there is no
                                #   comment. Also strip trailing newlines.
     (?:\#(?P<comment>.*))?     # Comments can be anything after a whitespace+#
-    $""", re.X)                #   and are optional.
+                               #   and are optional.
+    $""", re.X)
 
 
 def peep_hash(argv):
@@ -401,7 +404,9 @@ class DownloadedReq(object):
             return version
 
         def give_up(filename, package_name):
-            raise RuntimeError("The archive '%s' didn't start with the package name '%s', so I couldn't figure out the version number. My bad; improve me." %
+            raise RuntimeError("The archive '%s' didn't start with the package name "
+                               "'%s', so I couldn't figure out the version number. "
+                               "My bad; improve me." %
                                (filename, package_name))
 
         get_version = (version_of_wheel
@@ -434,7 +439,7 @@ class DownloadedReq(object):
 
         """
         path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
-                      self._req.comes_from).groups())
+                               self._req.comes_from).groups())
         return path, int(line)
 
     @memoize  # Avoid hitting the file[cache] over and over.
@@ -549,7 +554,6 @@ class DownloadedReq(object):
             size = 0
         pipe_to_file(response, join(self._temp_path, filename), size=size)
         return filename
-
 
     # Based on req_set.prepare_files() in pip bb2a8428d4aebc8d313d05d590f386fa3f0bbd0f
     @memoize  # Avoid re-downloading.
@@ -711,14 +715,14 @@ class MismatchedReq(DownloadedReq):
                 "freak out, because someone has tampered with the packages.\n\n")
 
     def error(self):
-        preamble = '    %s: expected%s' % (
-                self._project_name(),
-                ' one of' if len(self._expected_hashes()) > 1 else '')
-        return '%s %s\n%s got %s' % (
-            preamble,
-            ('\n' + ' ' * (len(preamble) + 1)).join(self._expected_hashes()),
-            ' ' * (len(preamble) - 4),
-            self._actual_hash())
+        preamble = '    %s: expected' % self._project_name()
+        if len(self._expected_hashes()) > 1:
+            preamble += ' one of'
+        padding = '\n' + ' ' * (len(preamble) + 1)
+        return '%s %s\n%s got %s' % (preamble,
+                                     padding.join(self._expected_hashes()),
+                                     ' ' * (len(preamble) - 4),
+                                     self._actual_hash())
 
     @classmethod
     def foot(cls):
@@ -794,7 +798,7 @@ def downloaded_reqs_from_path(path, argv):
         # (nor do we need it at all) so we only import it in this except block
         from pip.download import PipSession
         return downloaded_reqs(parse_requirements(
-                path, options=EmptyOptions(), session=PipSession()))
+            path, options=EmptyOptions(), session=PipSession()))
 
 
 def peep_install(argv):

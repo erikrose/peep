@@ -31,7 +31,7 @@ except ImportError:
 from nose import SkipTest
 from nose.tools import eq_, nottest
 
-from peep import EmptyOptions, SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange, activate
+from peep import SOMETHING_WENT_WRONG, downloaded_reqs_from_path, MissingReq, xrange, activate
 
 
 @contextmanager
@@ -172,7 +172,7 @@ class InstallTestCase(TestCase):
         # Just in case the env was left dirty:
         try:
             run('pip uninstall -y useless')
-        except CalledProcessError as exc:  # happens when it's not installed
+        except CalledProcessError:  # happens when it's not installed
             pass
 
 
@@ -311,7 +311,7 @@ class FullStackTests(ServerTestCase):
 
         # Install the new version:
         self.install_from_string(
-           """# sha256: JIAjkT1OSM1PIxLbvKk46W4iOTqH9yHASHTwvGVEC4k
+            """# sha256: JIAjkT1OSM1PIxLbvKk46W4iOTqH9yHASHTwvGVEC4k
             {index_url}useless/789abcd.zip#egg=useless""".format(
                 index_url=self.index_url()))
         # Make sure the new version is really installed:
@@ -334,8 +334,8 @@ class HashParsingTests(ServerTestCase):
         """
         with requirements(text) as path:
             return downloaded_reqs_from_path(
-                    path,
-                    ['-r', path, '--index-url', self.index_url()])
+                path,
+                ['-r', path, '--index-url', self.index_url()])
 
     def test_inline_comments(self):
         """Make sure various permutations of inline comments are parsed
