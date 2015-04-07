@@ -424,7 +424,7 @@ class DownloadedReq(object):
         # If this is a github sha tarball, then it is always unsatisfied
         # because the url has a commit sha in it and not the version
         # number.
-        url = self._req.url
+        url = self._url()
         if url:
             filename = filename_from_url(url)
             if filename.endswith(ARCHIVE_EXTENSIONS):
@@ -579,9 +579,7 @@ class DownloadedReq(object):
 
         # If the requirement isn't already specified as a URL, get a URL
         # from an index:
-        link = (finder.find_requirement(self._req, upgrade=False)
-                if self._req.url is None
-                else Link(self._req.url))
+        link = self._link() or finder.find_requirement(self._req, upgrade=False)
 
         if link:
             lower_scheme = link.scheme.lower()  # pip lower()s it for some reason.
@@ -644,8 +642,17 @@ class DownloadedReq(object):
     def _name(self):
         return self._req.name
 
+    def _link(self):
+        try:
+            return self._req.link
+        except AttributeError:
+            # The link attribute isn't available prior to pip 6.1.0, so fall
+            # back to the now deprecated 'url' attribute.
+            return Link(self._req.url) if self._req.url else None
+
     def _url(self):
-        return self._req.url
+        link = self._link()
+        return link.url if link else None
 
     @memoize  # Avoid re-running expensive check_if_exists().
     def _is_satisfied(self):
