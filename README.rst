@@ -213,6 +213,11 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
+master
+  * Copy the operative portion of the MIT license into peep.py so embedding it
+    doesn't break the license.
+  * Fix flake8 linter warnings.
+
 2.2
   * Add progress indication while downloading. Used with pip 6.0 and above, we
     show a nice progress bar. Before that, we just mention the packages as we
