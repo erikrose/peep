@@ -213,12 +213,13 @@ hash`` over both original archives, like so, and add the result to my
 Version History
 ===============
 
-master
+2.3
   * Copy the operative portion of the MIT license into peep.py so embedding it
     doesn't break the license.
   * Fix flake8 linter warnings.
   * Make peep compatible with pip v6.1.0+.
-  * Add tests against pip 6.0.8 and 6.1.1 to the tox config.
+  * Add tests against pip 6.0.8, 6.1.0, and 6.1.1 to the tox config.
+  * Run full set of tox tests on Travis.
 
 2.2
   * Add progress indication while downloading. Used with pip 6.0 and above, we

@@ -12,7 +12,7 @@ from setuptools import setup
 
 setup(
     name='peep',
-    version='2.2',
+    version='2.3',
     description='A "pip install" that is cryptographically guaranteed repeatable',
     long_description=open('README.rst').read(),
     author='Erik Rose',

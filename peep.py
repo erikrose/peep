@@ -105,7 +105,7 @@ except ImportError:
     DownloadProgressBar = DownloadProgressSpinner = NullProgressBar
 
 
-__version__ = 2, 2, 0
+__version__ = 2, 3, 0
 
 
 ITS_FINE_ITS_FINE = 0
