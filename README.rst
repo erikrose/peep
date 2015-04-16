@@ -64,6 +64,12 @@ Switching to Peep
 3. Add the recommended hash lines to your ``requirements.txt``, each one
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
+   
+   For example, the Pygments part of your ``requirements.txt`` will look like this::
+   
+       # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
+       Pygments==1.4
+   
 4. In the future, always use ``peep install`` to install your requirements. You
    are now cryptographically safe!
 
