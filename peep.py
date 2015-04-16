@@ -705,6 +705,8 @@ class MissingReq(DownloadedReq):
 
     def error(self):
         if self._url():
+            # _url() always contains an #egg= part, or this would be a
+            # MalformedRequest.
             line = self._url()
         else:
             line = '%s==%s' % (self._name(), self._version())
