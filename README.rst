@@ -64,12 +64,12 @@ Switching to Peep
 3. Add the recommended hash lines to your ``requirements.txt``, each one
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
-   
+
    For example, the Pygments part of your ``requirements.txt`` will look like this::
-   
+
        # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
        Pygments==1.4
-   
+
 4. In the future, always use ``peep install`` to install your requirements. You
    are now cryptographically safe!
 
@@ -218,6 +218,10 @@ hash`` over both original archives, like so, and add the result to my
 
 Version History
 ===============
+
+2.4
+  * Add support for flags in the requirements file, pip-style, such as
+    specifying alternative indices with ``-i``.
 
 2.3
   * Copy the operative portion of the MIT license into peep.py so embedding it
