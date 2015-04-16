@@ -222,6 +222,7 @@ Version History
 2.4
   * Add support for flags in the requirements file, pip-style, such as
     specifying alternative indices with ``-i``.
+  * Remove a duplicate ``#egg=`` segment from an error message.
 
 2.3
   * Copy the operative portion of the MIT license into peep.py so embedding it
