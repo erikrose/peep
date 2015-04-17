@@ -4,22 +4,22 @@
 Peep
 ====
 
-Deploying Python projects has long been a source of pain for the
-security-conscious. Any compromise of PyPI or its third-party CDN could get
+Deploying Python projects has long been a source of frustration for the
+security-conscious: a compromise of PyPI or its third-party CDN could get
 you a package different from the one you signed up for. To guarantee
 known-good dependencies for your deployments, you had to run a local package
-index, manually uploading packages as you vetted them, maintaining another set
-of ACLs, and trying to somehow keep an audit trail of who did what.
-Alternatively, you could check everything into a vendor library, which meant
-a lot of fooling around with your VCS (or maintaining custom tooling) to do
-upgrades.
+index, manually uploading packages as you vetted them, maintaining a set of
+ACLs for that server, and trying to somehow keep an audit trail of who did
+what. Alternatively, you could check everything into a vendor library, but that
+meant a lot of fooling around with your VCS (or maintaining custom tooling) to
+do upgrades.
 
 Peep fixes all that.
 
 Vet your packages, put hashes of the PyPI-sourced tarballs into
 ``requirements.txt``, use ``peep install`` instead of ``pip install``, and let
 the crypto do the rest. If a downloaded package doesn't match the expected hash,
-``peep`` will freak out, and installation will go no further:
+Peep will freak out, and installation will go no further:
 
 * No servers to maintain
 * No enormous vendor libs to wrestle
@@ -29,15 +29,14 @@ the crypto do the rest. If a downloaded package doesn't match the expected hash,
 Switching to Peep
 =================
 
-1. Install ``peep``::
+1. Install Peep::
 
     pip install peep
 
-    (Isn't this insecure? Indeed: you're trusting PyPI every time you do it.
-    See the Embedding section for how you can straightforwardly copy
-    ``peep.py`` into your source tree. Then you can trust it however you trust
-    the rest of your codebase.)
-2. Use ``peep`` to install your project once::
+   (Or, better, embed ``peep.py`` into your codebase as described in the
+   Embedding section below. That eliminates having to trust an unauthenticated
+   PyPI download, assuming you manually vet ``peep.py`` itself the first time.)
+2. Use Peep to install your project once::
 
         cd yourproject
         peep install -r requirements.txt
@@ -70,7 +69,7 @@ Switching to Peep
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
 
-   For example, the Pygments part of your ``requirements.txt`` will look like
+   For example, the Pygments part of your ``requirements.txt`` would look like
    this::
 
        # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
@@ -92,32 +91,10 @@ Switching to Peep
         pip install --no-deps dist/yourproject-1.0.tar.gz
 
 
-Security Guarantees
-===================
-
-1. Peep guarantees repeatability.
-
-   If you ``peep install`` package x version y, every subsequent install of package
-   x version y will be the same as the original, or Peep will complain.
-
-2. Peep does not vet your packages.
-
-   Peep is not a substitute for vetting your packages. If you don't vet them,
-   then they are not vetted.
-
-3. Peep does not alleviate trust problems with authors or package indexes.
-
-   All peep does is guarantee that subsequent downloads of package x version y
-   are the same as the first one you did. It doesn't guarantee the author of
-   that package is trustworthy. It doesn't guarantee that the author of that
-   package released that package. It doesn't guarantee that the package index
-   is trustworthy.
-
-
 The Fearsome Warning
 ====================
 
-If, during installation, a hash doesn't match, ``peep`` will say something like
+If, during installation, a hash doesn't match, Peep will say something like
 this::
 
     THE FOLLOWING PACKAGES DIDN'T MATCH THE HASHES SPECIFIED IN THE
@@ -130,15 +107,15 @@ this::
 It will then exit with a status of 1. Freak out appropriately.
 
 
-Other Niceties
+Other Features
 ==============
 
-* ``peep`` implicitly turns on pip's ``--no-deps`` option so unverified
+* Peep implicitly turns on pip's ``--no-deps`` option so unverified
   dependencies of your requirements can't sneak through.
-* All non-install commands just fall through to pip, so you can use ``peep``
+* All non-install commands just fall through to pip, so you can use Peep
   all the time if you want. This comes in handy for existing scripts that have
   a big ``$PIP=/path/to/pip`` at the top.
-* ``peep``-compatible requirements files remain entirely usable with ``pip``,
+* Peep-compatible requirements files remain entirely usable with ``pip``,
   because the hashes are just comments, after all.
 * Have a manually downloaded package you've vetted? Run ``peep hash`` on its
   tarball (the original, from PyPI--be sure to keep it around) to get its hash
@@ -147,8 +124,8 @@ Other Niceties
     % peep hash nose-1.3.0.tar.gz
     # sha256: TmPMMyXedc-Y_61AvnL6aXU96CRpUXMXj3TANP5PUmA
 * If a package is already present--which might be the case if you're installing
-  into a non-empty virtualenv--``peep`` doesn't bother downloading or building it
-  again. It assumes you installed it with ``peep`` in a previous invocation and
+  into a non-empty virtualenv--Peep doesn't bother downloading or building it
+  again. It assumes you installed it with Peep in a previous invocation and
   thus trusts it. Re-using a virtualenv during deployment can really speed
   things up, but it does leave open the question of how to remove dependencies
   which are no longer needed.
@@ -160,30 +137,38 @@ Embedding
 Peep was designed for unsupervised continuous deployment scenarios. In such
 scenarios, manual ahead-of-time preparation on the deployment machine is a
 liability: one more thing to go wrong. To relieve you of having to install (and
-upgrade) ``peep`` by hand on your server or build box, we've made ``peep``
+upgrade) Peep by hand on your server or build box, we've made Peep
 embeddable. You can copy the ``peep.py`` file directly into your project's
 source tree and call it from there in your deployment script. This also gives
 you an obvious starting point for your chain of trust: however you trust your
-source code is how you trust your copy of ``peep``, and ``peep`` verifies
-everything else via hashes. (Equivalent would be if your OS provided peep as a
+source code is how you trust your copy of Peep, and Peep verifies
+everything else via hashes. (Equivalent would be if your OS provided Peep as a
 package--presumably you trust your OS packages already--but this is not yet
 common.)
 
 
+Security and Insecurity
+=======================
+
+Here's what you get for free with Peep--and what you don't.
+
+**You get repeatability.** If you ``peep install`` package ``Foo==1.2.3``,
+every subsequent install of ``Foo==1.2.3`` will be the same as the original
+(or Peep will complain).
+
+**Peep does not magically vet your packages.** Peep is not a substitute for
+combing through your packages for malicious code or comparing them with
+known-good versions. If you don't vet them, they are not vetted.
+
+**Peep does not make authors or indices trustworthy.** All Peep does is
+guarantee that subsequent downloads of ``Foo==1.2.3`` are the same as the
+first one. It doesn't guarantee the author of that package is trustworthy. It
+doesn't guarantee that the author of that package is the one who released that
+package. It doesn't guarantee that the package index is trustworthy.
+
+
 Troubleshooting
 ===============
-
-Upgrading Wheels with Old Versions of pip
------------------------------------------
-
-If you're reusing a virtualenv and using peep with pip <6.0, then you should
-avoid using wheels. Otherwise, the old version of a package will not be entirely
-removed before the new one is installed, due to
-https://github.com/pypa/pip/issues/1825.
-
-If you're using pip 1.4, don't pass the ``--use-wheel`` argument.
-
-If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 
 Multiple Hashes: Architecture-Specific Packages and Old Versions of PyPI
 ------------------------------------------------------------------------
@@ -212,7 +197,7 @@ requirement, as long as they are within a contiguous block of commented lines::
 
 If you don't want to wait until you're bitten by this surprise, use the ``peep
 hash`` command to find hashes of each equivalent archive for a package. I like
-to vet one of them (say, the tarball), then download the other and use a file
+to vet one of them (say, the tarball), then download the others and use a file
 comparison tool to verify that they have identical contents. Then I run ``peep
 hash`` over both original archives, like so, and add the result to my
 ``requirements.txt``::
@@ -220,6 +205,18 @@ hash`` over both original archives, like so, and add the result to my
     % peep hash mock-0.8.0.tar.gz mock-0.8.0.zip
     # sha256: lvpN706AIAvoJ8P1EUfdez-ohzuSB-MyXUe6Rb8ppcE
     # sha256: 6QTt-5DahBKcBiUs06BfkLTuvBu1uF7pblb_bPaUONU
+
+Upgrading Wheels with Old Versions of pip
+-----------------------------------------
+
+If you're reusing a virtualenv and using Peep with pip <6.0, then you should
+avoid using wheels. Otherwise, the old version of a package will not be entirely
+removed before the new one is installed, due to
+https://github.com/pypa/pip/issues/1825.
+
+If you're using pip 1.4, don't pass the ``--use-wheel`` argument.
+
+If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 
 
 Version History
