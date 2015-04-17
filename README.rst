@@ -4,33 +4,40 @@
 Peep
 ====
 
-Historically, deploying Python projects has been a pain in the neck for the
-security-conscious. First, PyPI lets authors change the contents of their
-packages without revving their version numbers. Second, any future compromise
-of PyPI or its caching CDN means you could get a package that's different from
-the one you signed up for. If you wanted to guarantee known-good dependencies
-for your deployment, you had to either run a local PyPI mirror--manually
-uploading packages as you vetted them--or else check everything into a vendor
-library, necessitating a lot of fooling around with your VCS (or maintaining
-custom tooling) to do upgrades.
+Deploying Python projects has long been a source of pain for the
+security-conscious. Any compromise of PyPI or its third-party CDN could get
+you a package different from the one you signed up for. To guarantee
+known-good dependencies for your deployments, you had to run a local package
+index, manually uploading packages as you vetted them, maintaining another set
+of ACLs, and trying to somehow keep an audit trail of who did what.
+Alternatively, you could check everything into a vendor library, which meant
+a lot of fooling around with your VCS (or maintaining custom tooling) to do
+upgrades.
 
 Peep fixes all that.
 
 Vet your packages, put hashes of the PyPI-sourced tarballs into
 ``requirements.txt``, use ``peep install`` instead of ``pip install``, and let
-the crypto do the rest. If a downloaded package doesn't match the hash,
-``peep`` will freak out, and installation will go no further. No servers to
-maintain, no enormous vendor libs to wrestle. Just ``requirements.txt`` with
-some funny-looking comments and peace of mind.
+the crypto do the rest. If a downloaded package doesn't match the expected hash,
+``peep`` will freak out, and installation will go no further:
+
+* No servers to maintain
+* No enormous vendor libs to wrestle
+* Just ``requirements.txt`` with some funny-looking comments and peace of mind
 
 
 Switching to Peep
 =================
 
-0. Install ``peep``::
+1. Install ``peep``::
 
     pip install peep
-1. Use ``peep`` to install your project once::
+
+    (Isn't this insecure? Indeed: you're trusting PyPI every time you do it.
+    See the Embedding section for how you can straightforwardly copy
+    ``peep.py`` into your source tree. Then you can trust it however you trust
+    the rest of your codebase.)
+2. Use ``peep`` to install your project once::
 
         cd yourproject
         peep install -r requirements.txt
@@ -46,9 +53,6 @@ Switching to Peep
     # sha256: L9XU_-gfdi3So-WEctaQoNu6N2Z3ZQYAOu4-16qor-8
     Flask==0.9
 
-    # sha256: YhddA1kUpMLVODNbhIgHfQn88vioPHLwayTyqwOJEgY
-    futures==2.1.3
-
     # sha256: qF4YU3XbdcEJ-Z7N49VUFfA15waKgiUs9PFsZnrDj0k
     Jinja2==2.6
 
@@ -60,17 +64,19 @@ Switching to Peep
 
     -------------------------------
     Not proceeding to installation.
-2. Vet the packages coming off PyPI in whatever way you typically do.
-3. Add the recommended hash lines to your ``requirements.txt``, each one
+3. Vet the packages coming off PyPI in whatever way you typically do. For
+   instance, read them, or compare them with known-good local copies.
+4. Add the recommended hash lines to your ``requirements.txt``, each one
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
 
-   For example, the Pygments part of your ``requirements.txt`` will look like this::
+   For example, the Pygments part of your ``requirements.txt`` will look like
+   this::
 
        # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
        Pygments==1.4
 
-4. In the future, always use ``peep install`` to install your requirements. You
+5. In the future, always use ``peep install`` to install your requirements. You
    are now cryptographically safe!
 
 .. warning::
