@@ -152,7 +152,7 @@ Embedding
 =========
 
 Peep was designed for unsupervised continuous deployment scenarios. In such
-scenarios, manual ahead-of-time prepartion on the deployment machine is a
+scenarios, manual ahead-of-time preparation on the deployment machine is a
 liability: one more thing to go wrong. To relieve you of having to install (and
 upgrade) ``peep`` by hand on your server or build box, we've made ``peep``
 embeddable. You can copy the ``peep.py`` file directly into your project's
