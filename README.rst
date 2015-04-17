@@ -152,7 +152,7 @@ Embedding
 =========
 
 Peep was designed for unsupervised continuous deployment scenarios. In such
-scenarios, manual ahead-of-time prepartion on the deployment machine is a
+scenarios, manual ahead-of-time preparation on the deployment machine is a
 liability: one more thing to go wrong. To relieve you of having to install (and
 upgrade) ``peep`` by hand on your server or build box, we've made ``peep``
 embeddable. You can copy the ``peep.py`` file directly into your project's
@@ -167,13 +167,13 @@ common.)
 Troubleshooting
 ===============
 
-Upgrading wheels
-----------------
+Upgrading Wheels with Old Versions of pip
+-----------------------------------------
 
-If you're reusing a virtualenv, then you should avoid wheels until a version
-of pip that upgrades wheels properly is out. Otherwise, the old version of a
-package will not be entirely removed before the new one is installed. See
-https://github.com/pypa/pip/issues/1825 for more details.
+If you're reusing a virtualenv and using peep with pip <6.0, then you should
+avoid using wheels. Otherwise, the old version of a package will not be entirely
+removed before the new one is installed, due to
+https://github.com/pypa/pip/issues/1825.
 
 If you're using pip 1.4, don't pass the ``--use-wheel`` argument.
 
