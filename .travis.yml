@@ -1,6 +1,8 @@
 sudo: false
 language: python
-# Stick to a known-good version of tox, just in case:
-install: pip install tox==1.9.2
-# Command to run tests. 3.1 is missing on Travis.
-script: tox --skip-missing-interpreters
+install:
+  # Stick to a known-good version of tox, just in case:
+  - pip install tox==1.9.2 flake8==2.4.0
+script:
+  # Run linter and then the test suite. 3.1 is missing on Travis.
+  - flake8 --show-source && tox --skip-missing-interpreters
