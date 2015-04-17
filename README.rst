@@ -1,4 +1,5 @@
-.. image:: https://api.travis-ci.org/erikrose/peep.svg
+.. image:: https://travis-ci.org/erikrose/peep.svg?branch=master
+    :target: https://travis-ci.org/erikrose/peep
 
 ====
 Peep
