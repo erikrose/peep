@@ -167,13 +167,13 @@ common.)
 Troubleshooting
 ===============
 
-Upgrading wheels with old versions of pip
+Upgrading Wheels with Old Versions of pip
 -----------------------------------------
 
 If you're reusing a virtualenv and using peep with pip <6.0, then you should
 avoid using wheels. Otherwise, the old version of a package will not be entirely
-removed before the new one is installed, due to:
-https://github.com/pypa/pip/issues/1825
+removed before the new one is installed, due to
+https://github.com/pypa/pip/issues/1825.
 
 If you're using pip 1.4, don't pass the ``--use-wheel`` argument.
 
