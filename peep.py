@@ -355,7 +355,6 @@ class DownloadedReq(object):
         self._argv = argv
         self._finder = finder
 
-
         # We use a separate temp dir for each requirement so requirements
         # (from different indices) that happen to have the same archive names
         # don't overwrite each other, leading to a security hole in which the
