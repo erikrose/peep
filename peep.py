@@ -889,7 +889,7 @@ def exception_handler(exc_type, exc_value, exc_tb):
     print('---')
     print('peep:', repr(__version__))
     print('python:', repr(sys.version))
-    print('pip:', repr(pip.__version__))
+    print('pip:', repr(getattr(pip, '__version__', 'no __version__ attr')))
     print('Command line: ', repr(sys.argv))
     print(
         ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
