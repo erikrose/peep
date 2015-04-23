@@ -223,6 +223,11 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
+2.4.1
+  * Tolerate pip.__version__ being missing, which can apparently happen in
+    arcane situations during error handling, obscuring informative tracebacks.
+  * Fix flake8 warnings again, and add flake8 to Travis runs.
+
 2.4
   * Add support for flags in the requirements file, pip-style, such as
     specifying alternative indices with ``-i``.
