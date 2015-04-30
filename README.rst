@@ -17,14 +17,23 @@ do upgrades.
 
 Peep fixes all that.
 
-Vet your packages, put hashes of the PyPI-sourced tarballs into
-``requirements.txt``, use ``peep install`` instead of ``pip install``, and let
-the crypto do the rest. If a downloaded package doesn't match the expected hash,
-Peep will freak out, and installation will go no further:
+Vet your packages, and put hashes of the PyPI-sourced tarballs into
+``requirements.txt``, like this::
 
-* No servers to maintain
-* No enormous vendor libs to wrestle
-* Just ``requirements.txt`` with some funny-looking comments and peace of mind
+    # sha256: L9XU_-gfdi3So-WEctaQoNu6N2Z3ZQYAOu4-16qor-8
+    Flask==0.9
+
+    # sha256: qF4YU3XbdcEJ-Z7N49VUFfA15waKgiUs9PFsZnrDj0k
+    Jinja2==2.6
+
+Then, use ``peep install`` instead of ``pip install``, and let the crypto do
+the rest. If a downloaded package doesn't match the expected hash, Peep will
+freak out, and installation will go no further.
+
+There are no servers to maintain, no enormous vendor libs to wrestle, and no
+need to trust a package author's key management practices. With the addition
+of a few hashes to your requirements file, you can know that your chain of
+trust is safely rooted in your own source tree.
 
 
 Switching to Peep
@@ -69,13 +78,6 @@ Switching to Peep
 4. Add the recommended hash lines to your ``requirements.txt``, each one
    directly above the requirement it applies to. (The hashes are of the
    original, compressed tarballs from PyPI.)
-
-   For example, the Pygments part of your ``requirements.txt`` would look like
-   this::
-
-       # sha256: u_8C3DCeUoRt2WPSlIOnKV_MAhYkc40zNZxDlxCA-as
-       Pygments==1.4
-
 5. In the future, always use ``peep install`` to install your requirements. You
    are now cryptographically safe!
 
