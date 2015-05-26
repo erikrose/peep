@@ -104,6 +104,11 @@ except ImportError:
 
     DownloadProgressBar = DownloadProgressSpinner = NullProgressBar
 
+try:
+    from pip.index import FormatControl  # 7.0
+    format_control_arg = 'format_control'
+except ImportError:
+    format_control_arg = 'use_wheel'
 
 __version__ = 2, 4, 1
 
@@ -311,7 +316,7 @@ def package_finder(argv):
     # Carry over PackageFinder kwargs that have [about] the same names as
     # options attr names:
     possible_options = [
-        'find_links', 'use_wheel', 'allow_external', 'allow_unverified',
+        'find_links', format_control_arg, 'allow_external', 'allow_unverified',
         'allow_all_external', ('allow_all_prereleases', 'pre'),
         'process_dependency_links']
     kwargs = {}
