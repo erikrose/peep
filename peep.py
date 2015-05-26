@@ -105,10 +105,10 @@ except ImportError:
     DownloadProgressBar = DownloadProgressSpinner = NullProgressBar
 
 try:
-    from pip.index import FormatControl  # 7.0
+    from pip.index import FormatControl  # noqa
     format_control_arg = 'format_control'
 except ImportError:
-    format_control_arg = 'use_wheel'
+    format_control_arg = 'use_wheel'   # pre-7
 
 __version__ = 2, 4, 1
 
