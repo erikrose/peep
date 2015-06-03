@@ -31,7 +31,7 @@ import cgi
 from collections import defaultdict
 from functools import wraps
 from hashlib import sha256
-from itertools import chain
+from itertools import chain, count, islice
 from linecache import getline
 import mimetypes
 from optparse import OptionParser
@@ -107,8 +107,10 @@ except ImportError:
 try:
     from pip.index import FormatControl  # noqa
     format_control_arg = 'format_control'
+    PIP_COUNTS_COMMENTS = False
 except ImportError:
     format_control_arg = 'use_wheel'   # pre-7
+    PIP_COUNTS_COMMENTS = True
 
 __version__ = 2, 4, 1
 
@@ -222,6 +224,8 @@ def requirement_args(argv, want_paths=False, want_other=False):
             if want_other:
                 yield arg
 
+# any line that is a comment or just whitespace
+IGNORED_LINE_RE = re.compile(r'^(\s*#.*)?\s*$')
 
 HASH_COMMENT_RE = re.compile(
     r"""
@@ -452,23 +456,31 @@ class DownloadedReq(object):
     def _expected_hashes(self):
         """Return a list of known-good hashes for this package."""
 
-        def hashes_above(path, line_number):
-            """Yield hashes from contiguous comment lines before line
-            ``line_number``.
+        def get_hash_lists(path):
+            """Yield lists of hashes appearing between non-comment lines.
 
+            The lists will be in order of appearance and, for each non-empty
+            list, their place in the results will coincide with that of the
+            line number of the corresponding result from `parse_requirements`
+            (which changed in pip 7.0 to not count comments).
             """
-            for line_number in xrange(line_number - 1, 0, -1):
-                line = getline(path, line_number)
-                match = HASH_COMMENT_RE.match(line)
-                if match:
-                    yield match.groupdict()['hash']
-                elif not line.lstrip().startswith('#'):
-                    # If we hit a non-comment line, abort
+            hashes = []
+            for lineno in count(1):
+                line = getline(path, lineno)
+                if line == '':
                     break
+                match = HASH_COMMENT_RE.match(line)
+                if match:  # accumulate hashes seen so far
+                    hashes.append(match.groupdict()['hash'])
+                if not IGNORED_LINE_RE.match(line):
+                    yield hashes  # report hashes seen so far
+                    hashes = []
+                elif PIP_COUNTS_COMMENTS:
+                    # comment, count as normal req, but no hashes
+                    yield []
 
-        hashes = list(hashes_above(*self._path_and_line()))
-        hashes.reverse()  # because we read them backwards
-        return hashes
+        path, line_number = self._path_and_line()
+        return next(islice(get_hash_lists(path), line_number-1, None))
 
     def _download(self, link):
         """Download a file, and return its name within my temp dir.
