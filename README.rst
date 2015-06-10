@@ -129,9 +129,12 @@ Other Features
 * If a package is already present--which might be the case if you're installing
   into a non-empty virtualenv--Peep doesn't bother downloading or building it
   again. It assumes you installed it with Peep in a previous invocation and
-  thus trusts it. Re-using a virtualenv during deployment can really speed
-  things up, but it does leave open the question of how to remove dependencies
-  which are no longer needed.
+  thus trusts it. The only exception to this is for URL-specified requirements where the
+  URL contains a SHA-like filename (eg https://github.com/foo/bar/archive/<SHA>.zip),
+  since the package version number is typically not incremented for every commit, so
+  Peep cannot be sure the contents have not changed. 
+  Note: Re-using a virtualenv during deployment can really speed things up, but you will
+  need to manually remove dependencies that are no longer in the requirements file.
 
 
 Embedding
