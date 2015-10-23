@@ -19,7 +19,22 @@ except ImportError:
     from socketserver import TCPServer
 from pipes import quote
 from posixpath import normpath
-from subprocess import CalledProcessError, check_call
+from subprocess import CalledProcessError, PIPE, Popen
+try:
+    from subprocess import check_output
+except ImportError:  # py2.6
+    def check_output(*popenargs, **kwargs):
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = Popen(stdout=PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise CalledProcessError(retcode, cmd)
+        return output
 from tempfile import mkdtemp
 from threading import Thread
 from unittest import TestCase
@@ -82,7 +97,7 @@ def running_setup_py(should_run_it=True, should_make_sure_did_not_upgrade=False)
 
 
 def run(command, **kwargs):
-    """Run and return the exit status of a command.
+    """Run and return the output of a command.
 
     Raise CalledProcessError on error.
 
@@ -101,7 +116,7 @@ def run(command, **kwargs):
     doesn't need to be read out of order, as with anonymous tokens.
 
     """
-    return check_call(
+    return check_output(
         command.format(**dict((k, quote(v)) for k, v in kwargs.items())),
         shell=True)
 
@@ -355,6 +370,49 @@ class FullStackTests(ServerTestCase):
 
         # Clean up:
         run('pip uninstall -y useless')
+
+    def test_port(self):
+        """Test peep port."""
+        # We can't get the package name from URL-based requirements before pip
+        # 1.0. Tolerate it so we can at least test everything else:
+        try:
+            activate('pip>=1.0.1')
+        except RuntimeError:
+            schema_package_name = 'None'
+        else:
+            schema_package_name = 'schema'
+
+        reqs = """
+            # sha256: Jo-gDCfedW1xZj3WH3OkqNhydWm7G0dLLOYCBVOCaHI
+            # sha256: mXhebPcVzc3lne4FpnbpnwSDWnHnztIByjF0AcMiupY
+            certifi==2015.04.28
+            # Those were 2 hashes!
+
+            # A comment above hash
+            # sha256: mrHTE_mbIJ-PcaYp82gzAwyNfHIoLPd1aDS69WfcpmI
+            # A comment between hash and package
+            click==4.0
+
+            # No hash:
+            configobj==5.0.6
+
+            # sha256: mEFMy7mQkCOXKZaP5CJaMXPj8OwbteW9dmq9drwZqNk
+            https://github.com/erikrose/schema/archive/99dc4130f0f05fd3c2d4bc6663a2419851f3c90f.zip#egg=schema
+            """
+        with requirements(reqs) as reqs_path:
+            result = run('{python} {peep} port {reqs}',
+                         python=python_path(),
+                         peep=peep_path(),
+                         reqs=reqs_path).decode('ascii')
+        expected = (
+            'certifi==2015.04.28 \\\n'
+            '    --hash=sha256:268fa00c27de756d71663dd61f73a4a8d8727569bb1b474b2ce6020553826872 \\\n'
+            '    --hash=sha256:99785e6cf715cdcde59dee05a676e99f04835a71e7ced201ca317401c322ba96\n'
+            'click==4.0 --hash=sha256:9ab1d313f99b209f8f71a629f36833030c8d7c72282cf7756834baf567dca662\n'
+            'configobj==5.0.6\n'
+            '{schema} --hash=sha256:98414ccbb99090239729968fe4225a3173e3f0ec1bb5e5bd766abd76bc19a8d9\n'.format(
+                schema=schema_package_name))
+        eq_(result, expected)
 
 
 class HashParsingTests(ServerTestCase):

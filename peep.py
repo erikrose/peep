@@ -26,7 +26,8 @@ try:
     xrange = xrange
 except NameError:
     xrange = range
-from base64 import urlsafe_b64encode
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from binascii import hexlify
 import cgi
 from collections import defaultdict
 from functools import wraps
@@ -147,6 +148,31 @@ def encoded_hash(sha):
 
     """
     return urlsafe_b64encode(sha.digest()).decode('ascii').rstrip('=')
+
+
+def path_and_line(req):
+    """Return the path and line number of the file from which an
+    InstallRequirement came.
+
+    """
+    path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
+                           req.comes_from).groups())
+    return path, int(line)
+
+
+def hashes_above(path, line_number):
+    """Yield hashes from contiguous comment lines before line
+    ``line_number``.
+
+    """
+    for line_number in xrange(line_number - 1, 0, -1):
+        line = getline(path, line_number)
+        match = HASH_COMMENT_RE.match(line)
+        if match:
+            yield match.groupdict()['hash']
+        elif not line.lstrip().startswith('#'):
+            # If we hit a non-comment line, abort
+            break
 
 
 def run_pip(initial_args):
@@ -434,34 +460,10 @@ class DownloadedReq(object):
                     return True
         return False
 
-    def _path_and_line(self):
-        """Return the path and line number of the file from which our
-        InstallRequirement came.
-
-        """
-        path, line = (re.match(r'-r (.*) \(line (\d+)\)$',
-                               self._req.comes_from).groups())
-        return path, int(line)
-
     @memoize  # Avoid hitting the file[cache] over and over.
     def _expected_hashes(self):
         """Return a list of known-good hashes for this package."""
-
-        def hashes_above(path, line_number):
-            """Yield hashes from contiguous comment lines before line
-            ``line_number``.
-
-            """
-            for line_number in xrange(line_number - 1, 0, -1):
-                line = getline(path, line_number)
-                match = HASH_COMMENT_RE.match(line)
-                if match:
-                    yield match.groupdict()['hash']
-                elif not line.lstrip().startswith('#'):
-                    # If we hit a non-comment line, abort
-                    break
-
-        hashes = list(hashes_above(*self._path_and_line()))
+        hashes = list(hashes_above(*path_and_line(self._req)))
         hashes.reverse()  # because we read them backwards
         return hashes
 
@@ -783,6 +785,22 @@ def first_every_last(iterable, first, every, last):
         last(item)
 
 
+def _parse_requirements(path, finder):
+    try:
+        # list() so the generator that is parse_requirements() actually runs
+        # far enough to report a TypeError
+        return list(parse_requirements(
+            path, options=EmptyOptions(), finder=finder))
+    except TypeError:
+        # session is a required kwarg as of pip 6.0 and will raise
+        # a TypeError if missing. It needs to be a PipSession instance,
+        # but in older versions we can't import it from pip.download
+        # (nor do we need it at all) so we only import it in this except block
+        from pip.download import PipSession
+        return list(parse_requirements(
+            path, options=EmptyOptions(), session=PipSession(), finder=finder))
+
+
 def downloaded_reqs_from_path(path, argv):
     """Return a list of DownloadedReqs representing the requirements parsed
     out of a given requirements file.
@@ -792,22 +810,8 @@ def downloaded_reqs_from_path(path, argv):
 
     """
     finder = package_finder(argv)
-
-    def downloaded_reqs(parsed_reqs):
-        """Just avoid repeating this list comp."""
-        return [DownloadedReq(req, argv, finder) for req in parsed_reqs]
-
-    try:
-        return downloaded_reqs(parse_requirements(
-            path, options=EmptyOptions(), finder=finder))
-    except TypeError:
-        # session is a required kwarg as of pip 6.0 and will raise
-        # a TypeError if missing. It needs to be a PipSession instance,
-        # but in older versions we can't import it from pip.download
-        # (nor do we need it at all) so we only import it in this except block
-        from pip.download import PipSession
-        return downloaded_reqs(parse_requirements(
-            path, options=EmptyOptions(), session=PipSession(), finder=finder))
+    return [DownloadedReq(req, argv, finder) for req in
+            _parse_requirements(path, finder)]
 
 
 def peep_install(argv):
@@ -864,10 +868,39 @@ def peep_install(argv):
         print(''.join(output))
 
 
+def peep_port(paths):
+    """Convert a peep requirements file to one compatble with pip-8 hashing.
+
+    Loses comments and tromps on URLs, so the result will need a little manual
+    massaging, but the hard part--the hash conversion--is done for you.
+
+    """
+    if not paths:
+        print('Please specify one or more requirements files so I have '
+              'something to port.\n')
+        return COMMAND_LINE_ERROR
+    for req in chain.from_iterable(
+            _parse_requirements(path, package_finder(argv)) for path in paths):
+        hashes = [hexlify(urlsafe_b64decode((hash + '=').encode('ascii'))).decode('ascii')
+                  for hash in hashes_above(*path_and_line(req))]
+        hashes.reverse()
+        if not hashes:
+            print(req.req)
+        elif len(hashes) == 1:
+            print('%s --hash=sha256:%s' % (req.req, hashes[0]))
+        else:
+            print('%s' % req.req, end='')
+            for hash in hashes:
+                print(' \\')
+                print('    --hash=sha256:%s' % hash, end='')
+            print()
+
+
 def main():
     """Be the top-level entrypoint. Return a shell status code."""
     commands = {'hash': peep_hash,
-                'install': peep_install}
+                'install': peep_install,
+                'port': peep_port}
     try:
         if len(argv) >= 2 and argv[1] in commands:
             return commands[argv[1]](argv[2:])

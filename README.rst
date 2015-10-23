@@ -1,6 +1,14 @@
 .. image:: https://travis-ci.org/erikrose/peep.svg?branch=master
     :target: https://travis-ci.org/erikrose/peep
 
+.. note::
+
+    Peep is deprecated in favor of the `hash-checking functionality built into
+    pip 8
+    <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking-mode>`_.
+    After you've upgraded your infrastructure to pip 8, switch the format of
+    your hashes using ``peep port``, described below.
+
 ====
 Peep
 ====
@@ -135,6 +143,19 @@ Other Features
   Peep cannot be sure the contents have not changed. 
   Note: Re-using a virtualenv during deployment can really speed things up, but you will
   need to manually remove dependencies that are no longer in the requirements file.
+* ``peep port`` converts a peep-savvy requirements file to one compatible with
+  `pip 8's new hashing functionality
+  <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking-
+  mode>`_::
+
+    % peep port requirements.txt
+    certifi==2015.04.28 \
+        --hash=sha256:268fa00c27de756d71663dd61f73a4a8d8727569bb1b474b2ce6020553826872 \
+        --hash=sha256:99785e6cf715cdcde59dee05a676e99f04835a71e7ced201ca317401c322ba96
+    click==4.0 --hash=sha256:9ab1d313f99b209f8f71a629f36833030c8d7c72282cf7756834baf567dca662
+
+  Note that comments and URLs don't make it through, but the hard part—hash
+  format conversion—is taken care of for you.
 
 
 Embedding
@@ -227,6 +248,13 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 
 Version History
 ===============
+
+2.5
+  * Add ``peep port`` command to facilitate the transition to `pip 8's hashing
+    <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking-
+  mode>`_.
+  * Fix bug in which the right way to call ``parse_requirements()`` would not
+    be autodetected.
 
 2.4.1
   * Tolerate pip.__version__ being missing, which can apparently happen in
