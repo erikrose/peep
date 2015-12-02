@@ -3,11 +3,11 @@
 
 .. note::
 
-    Peep is deprecated in favor of the `hash-checking functionality built into
-    pip 8
-    <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking-mode>`_.
-    After you've upgraded your infrastructure to pip 8, switch the format of
-    your hashes using ``peep port``, described below.
+    Peep will soon be deprecated in favor of the `hash-checking functionality
+    built into pip 8
+    <https://pip.pypa.io/en/latest/reference/pip_install/#hash-checking-mode>`_.
+    Once you've upgraded your infrastructure to pip 8, due out early 2016,
+    switch the format of your hashes using ``peep port``, described below.
 
 ====
 Peep
@@ -145,8 +145,7 @@ Other Features
   need to manually remove dependencies that are no longer in the requirements file.
 * ``peep port`` converts a peep-savvy requirements file to one compatible with
   `pip 8's new hashing functionality
-  <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking-
-  mode>`_::
+  <https://pip.pypa.io/en/latest/reference/pip_install/#hash-checking-mode>`_::
 
     % peep port requirements.txt
     certifi==2015.04.28 \
@@ -251,8 +250,7 @@ Version History
 
 2.5
   * Add ``peep port`` command to facilitate the transition to `pip 8's hashing
-    <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking-
-  mode>`_.
+    <https://pip.pypa.io/en/latest/reference/pip_install/#hash-checking-mode>`_.
   * Fix bug in which the right way to call ``parse_requirements()`` would not
     be autodetected.
 
