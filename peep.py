@@ -31,8 +31,7 @@ import cgi
 from collections import defaultdict
 from functools import wraps
 from hashlib import sha256
-from itertools import chain, count, islice
-from linecache import getline
+from itertools import chain, islice
 import mimetypes
 from optparse import OptionParser
 from os.path import join, basename, splitext, isdir
@@ -466,24 +465,23 @@ class DownloadedReq(object):
             list, their place in the results will coincide with that of the
             line number of the corresponding result from `parse_requirements`
             (which changed in pip 7.0 to not count comments).
+
             """
             hashes = []
-            for lineno in count(1):
-                line = getline(path, lineno)
-                if line == '':
-                    break
-                match = HASH_COMMENT_RE.match(line)
-                if match:  # accumulate hashes seen so far
-                    hashes.append(match.groupdict()['hash'])
-                if not IGNORED_LINE_RE.match(line):
-                    yield hashes  # report hashes seen so far
-                    hashes = []
-                elif PIP_COUNTS_COMMENTS:
-                    # comment, count as normal req, but no hashes
-                    yield []
+            with open(path) as file:
+                for lineno, line in enumerate(file, 1):
+                    match = HASH_COMMENT_RE.match(line)
+                    if match:  # Accumulate this hash.
+                        hashes.append(match.groupdict()['hash'])
+                    if not IGNORED_LINE_RE.match(line):
+                        yield hashes  # Report hashes seen so far.
+                        hashes = []
+                    elif PIP_COUNTS_COMMENTS:
+                        # Comment: count as normal req but have no hashes.
+                        yield []
 
         path, line_number = self._path_and_line()
-        return next(islice(get_hash_lists(path), line_number-1, None))
+        return next(islice(get_hash_lists(path), line_number - 1, None))
 
     def _download(self, link):
         """Download a file, and return its name within my temp dir.
