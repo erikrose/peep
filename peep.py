@@ -106,10 +106,13 @@ except ImportError:
 
 try:
     from pip.index import FormatControl  # noqa
-    format_control_arg = 'format_control'
-    PIP_COUNTS_COMMENTS = False
+    FORMAT_CONTROL_ARG = 'format_control'
+
+    # The line-numbering bug will be fixed in pip 8. All 7.x releases had it.
+    PIP_MAJOR_VERSION = int(pip.__version__.split('.')[0])
+    PIP_COUNTS_COMMENTS = PIP_MAJOR_VERSION >= 8
 except ImportError:
-    format_control_arg = 'use_wheel'   # pre-7
+    FORMAT_CONTROL_ARG = 'use_wheel'  # pre-7
     PIP_COUNTS_COMMENTS = True
 
 __version__ = 2, 4, 1
@@ -320,7 +323,7 @@ def package_finder(argv):
     # Carry over PackageFinder kwargs that have [about] the same names as
     # options attr names:
     possible_options = [
-        'find_links', format_control_arg, 'allow_external', 'allow_unverified',
+        'find_links', FORMAT_CONTROL_ARG, 'allow_external', 'allow_unverified',
         'allow_all_external', ('allow_all_prereleases', 'pre'),
         'process_dependency_links']
     kwargs = {}
