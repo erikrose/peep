@@ -114,7 +114,7 @@ except ImportError:
     FORMAT_CONTROL_ARG = 'use_wheel'  # pre-7
     PIP_COUNTS_COMMENTS = True
 
-__version__ = 2, 4, 1
+__version__ = 2, 5, 0
 
 
 ITS_FINE_ITS_FINE = 0
