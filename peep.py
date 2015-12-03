@@ -32,8 +32,7 @@ import cgi
 from collections import defaultdict
 from functools import wraps
 from hashlib import sha256
-from itertools import chain
-from linecache import getline
+from itertools import chain, islice
 import mimetypes
 from optparse import OptionParser
 from os.path import join, basename, splitext, isdir
@@ -105,8 +104,18 @@ except ImportError:
 
     DownloadProgressBar = DownloadProgressSpinner = NullProgressBar
 
-
 __version__ = 2, 5, 0
+
+try:
+    from pip.index import FormatControl  # noqa
+    FORMAT_CONTROL_ARG = 'format_control'
+
+    # The line-numbering bug will be fixed in pip 8. All 7.x releases had it.
+    PIP_MAJOR_VERSION = int(pip.__version__.split('.')[0])
+    PIP_COUNTS_COMMENTS = PIP_MAJOR_VERSION >= 8
+except ImportError:
+    FORMAT_CONTROL_ARG = 'use_wheel'  # pre-7
+    PIP_COUNTS_COMMENTS = True
 
 
 ITS_FINE_ITS_FINE = 0
@@ -161,18 +170,32 @@ def path_and_line(req):
 
 
 def hashes_above(path, line_number):
-    """Yield hashes from contiguous comment lines before line
-    ``line_number``.
+    """Yield hashes from contiguous comment lines before line ``line_number``.
 
     """
-    for line_number in xrange(line_number - 1, 0, -1):
-        line = getline(path, line_number)
-        match = HASH_COMMENT_RE.match(line)
-        if match:
-            yield match.groupdict()['hash']
-        elif not line.lstrip().startswith('#'):
-            # If we hit a non-comment line, abort
-            break
+    def hash_lists(path):
+        """Yield lists of hashes appearing between non-comment lines.
+
+        The lists will be in order of appearance and, for each non-empty
+        list, their place in the results will coincide with that of the
+        line number of the corresponding result from `parse_requirements`
+        (which changed in pip 7.0 to not count comments).
+
+        """
+        hashes = []
+        with open(path) as file:
+            for lineno, line in enumerate(file, 1):
+                match = HASH_COMMENT_RE.match(line)
+                if match:  # Accumulate this hash.
+                    hashes.append(match.groupdict()['hash'])
+                if not IGNORED_LINE_RE.match(line):
+                    yield hashes  # Report hashes seen so far.
+                    hashes = []
+                elif PIP_COUNTS_COMMENTS:
+                    # Comment: count as normal req but have no hashes.
+                    yield []
+
+    return next(islice(hash_lists(path), line_number - 1, None))
 
 
 def run_pip(initial_args):
@@ -243,6 +266,8 @@ def requirement_args(argv, want_paths=False, want_other=False):
             if want_other:
                 yield arg
 
+# any line that is a comment or just whitespace
+IGNORED_LINE_RE = re.compile(r'^(\s*#.*)?\s*$')
 
 HASH_COMMENT_RE = re.compile(
     r"""
@@ -337,7 +362,7 @@ def package_finder(argv):
     # Carry over PackageFinder kwargs that have [about] the same names as
     # options attr names:
     possible_options = [
-        'find_links', 'use_wheel', 'allow_external', 'allow_unverified',
+        'find_links', FORMAT_CONTROL_ARG, 'allow_external', 'allow_unverified',
         'allow_all_external', ('allow_all_prereleases', 'pre'),
         'process_dependency_links']
     kwargs = {}
@@ -463,9 +488,7 @@ class DownloadedReq(object):
     @memoize  # Avoid hitting the file[cache] over and over.
     def _expected_hashes(self):
         """Return a list of known-good hashes for this package."""
-        hashes = list(hashes_above(*path_and_line(self._req)))
-        hashes.reverse()  # because we read them backwards
-        return hashes
+        return hashes_above(*path_and_line(self._req))
 
     def _download(self, link):
         """Download a file, and return its name within my temp dir.
@@ -883,7 +906,6 @@ def peep_port(paths):
             _parse_requirements(path, package_finder(argv)) for path in paths):
         hashes = [hexlify(urlsafe_b64decode((hash + '=').encode('ascii'))).decode('ascii')
                   for hash in hashes_above(*path_and_line(req))]
-        hashes.reverse()
         if not hashes:
             print(req.req)
         elif len(hashes) == 1:

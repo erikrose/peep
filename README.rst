@@ -249,6 +249,8 @@ Version History
 ===============
 
 2.5
+  * Support pip 7.x, through the currently latest 7.1.2, working around its
+    buggy line counting. (kouk)
   * Add ``peep port`` command to facilitate the transition to `pip 8's hashing
     <https://pip.pypa.io/en/latest/reference/pip_install/#hash-checking-mode>`_.
   * Fix bug in which the right way to call ``parse_requirements()`` would not
