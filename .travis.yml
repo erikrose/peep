@@ -2,7 +2,7 @@ sudo: false
 language: python
 install:
   # Stick to a known-good version of tox, just in case:
-  - pip install tox==1.9.2 flake8==2.4.0
+  - pip install tox==1.9.2 virtualenv==13.1.2 flake8==2.4.0
 script:
   # Run linter and then the test suite. 3.1 is missing on Travis.
   - flake8 --show-source && tox --skip-missing-interpreters
