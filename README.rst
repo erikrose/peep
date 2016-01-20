@@ -248,6 +248,9 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
+Unreleased
+  * Drop support for Python 3.1/3.2.
+
 2.5
   * Support pip 7.x, through the currently latest 7.1.2, working around its
     buggy line counting. (kouk)
