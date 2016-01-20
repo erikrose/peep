@@ -1,5 +1,8 @@
 sudo: false
 language: python
+cache:
+  directories:
+    - $HOME/.cache/pip
 install:
   # Stick to a known-good version of tox, just in case:
   - pip install tox==1.9.2 virtualenv==13.1.2 flake8==2.4.0
