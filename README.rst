@@ -248,7 +248,7 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
-Unreleased
+3.0.0
   * Add support for pip 8.x.
   * Drop support for the ``--allow-external``, ``--allow-unverified`` and
     ``--allow-all-external`` arguments (for compatibility with pip v8).

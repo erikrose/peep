@@ -104,7 +104,7 @@ except ImportError:
 
     DownloadProgressBar = DownloadProgressSpinner = NullProgressBar
 
-__version__ = 2, 5, 0
+__version__ = 3, 0, 0
 
 try:
     from pip.index import FormatControl  # noqa
