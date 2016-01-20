@@ -248,6 +248,12 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
+3.0.0
+  * Add support for pip 8.x.
+  * Drop support for the ``--allow-external``, ``--allow-unverified`` and
+    ``--allow-all-external`` arguments (for compatibility with pip v8).
+  * Drop support for Python 3.1/3.2.
+
 2.5
   * Support pip 7.x, through the currently latest 7.1.2, working around its
     buggy line counting. (kouk)
