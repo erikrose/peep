@@ -21,6 +21,10 @@
     verification as a feature worth uplifting, and now the package ecosystem is
     safer for everyone.
 
+    Here are some `more detailed upgrade instructions
+    <https://github.com/erikrose/peep/wiki/UpgradeToPip8>`_ in case you need
+    them.
+
 ====
 Peep
 ====
