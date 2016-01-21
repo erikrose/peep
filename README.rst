@@ -3,11 +3,23 @@
 
 .. note::
 
-    Peep will soon be deprecated in favor of the `hash-checking functionality
-    built into pip 8
-    <https://pip.pypa.io/en/latest/reference/pip_install/#hash-checking-mode>`_.
-    Once you've upgraded your infrastructure to pip 8, due out early 2016,
-    switch the format of your hashes using ``peep port``, described below.
+    Peep is deprecated, as we have `merged its functionality into pip 8
+    <https://pip.readthedocs.org/en/stable/reference/pip_install/#hash-checking
+    -mode>`_. This brings myriad improvements, including support for caching,
+    detection of omitted dependencies, and better handling of errors and corner
+    cases. To switch to pip 8's hash-checking without hitting any race
+    conditions...
+
+    1. Upgrade to peep 3.0 (which exists mainly as a stopgap to support
+       race-free upgrades like this).
+    2. Upgrade to pip 8.
+    3. Atomically, switch the format of your requirements files using ``peep
+       port`` (described below), and start calling pip instead of peep.
+    4. Delete peep from your project.
+
+    Thank you for using peep! Your early support helped establish hash
+    verification as a feature worth uplifting, and now the package ecosystem is
+    safer for everyone.
 
 ====
 Peep
@@ -251,7 +263,7 @@ Version History
 3.0
   * Add support for pip 8.x.
   * Drop support for the ``--allow-external``, ``--allow-unverified`` and
-    ``--allow-all-external`` arguments (for compatibility with pip v8).
+    ``--allow-all-external`` arguments (for compatibility with pip 8).
   * Drop support for Python 3.1/3.2.
 
 2.5
