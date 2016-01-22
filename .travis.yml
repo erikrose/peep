@@ -3,6 +3,10 @@ language: python
 cache:
   directories:
     - $HOME/.cache/pip
+env:
+  global:
+    # Speeds up pip installs and reduces log spam.
+    - PIP_DISABLE_PIP_VERSION_CHECK=1
 install:
   # Stick to a known-good version of tox, just in case:
   - pip install tox==1.9.2 virtualenv==13.1.2 flake8==2.4.0
