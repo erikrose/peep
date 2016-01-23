@@ -405,13 +405,16 @@ class FullStackTests(ServerTestCase):
                          peep=peep_path(),
                          reqs=reqs_path).decode('ascii')
         expected = (
+            '\n# from {reqs_path}\n\n'
             'certifi==2015.04.28 \\\n'
             '    --hash=sha256:268fa00c27de756d71663dd61f73a4a8d8727569bb1b474b2ce6020553826872 \\\n'
             '    --hash=sha256:99785e6cf715cdcde59dee05a676e99f04835a71e7ced201ca317401c322ba96\n'
-            'click==4.0 --hash=sha256:9ab1d313f99b209f8f71a629f36833030c8d7c72282cf7756834baf567dca662\n'
+            'click==4.0 \\\n'
+            '    --hash=sha256:9ab1d313f99b209f8f71a629f36833030c8d7c72282cf7756834baf567dca662\n'
             'configobj==5.0.6\n'
-            '{schema} --hash=sha256:98414ccbb99090239729968fe4225a3173e3f0ec1bb5e5bd766abd76bc19a8d9\n'.format(
-                schema=schema_package_name))
+            '{schema} \\\n'
+            '    --hash=sha256:98414ccbb99090239729968fe4225a3173e3f0ec1bb5e5bd766abd76bc19a8d9\n'
+            ''.format(schema=schema_package_name, reqs_path=reqs_path))
         eq_(result, expected)
 
 
