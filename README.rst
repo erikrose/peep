@@ -264,6 +264,11 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
+3.1
+  * Print the name each new requirements file we encounter during ``peep
+    port``. This helps untangle the mess if your files use includes. (pmac)
+  * Always put hashes on their own lines, even if there's only one. (pmac)
+
 3.0
   * Add support for pip 8.x.
   * Drop support for the ``--allow-external``, ``--allow-unverified`` and
