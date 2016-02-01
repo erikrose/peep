@@ -376,11 +376,16 @@ class FullStackTests(ServerTestCase):
         # We can't get the package name from URL-based requirements before pip
         # 1.0. Tolerate it so we can at least test everything else:
         try:
-            activate('pip>=1.0.1')
+            activate('pip>=6.1.0')
         except RuntimeError:
-            schema_package_name = 'None'
+            try:
+                activate('pip>=1.0.1')
+            except RuntimeError:
+                schema_package_name = 'None'
+            else:
+                schema_package_name = 'schema'
         else:
-            schema_package_name = 'schema'
+            schema_package_name = 'https://github.com/erikrose/schema/archive/99dc4130f0f05fd3c2d4bc6663a2419851f3c90f.zip#egg=schema'
 
         reqs = """
             # sha256: Jo-gDCfedW1xZj3WH3OkqNhydWm7G0dLLOYCBVOCaHI

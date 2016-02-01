@@ -920,7 +920,7 @@ def peep_port(paths):
         if not hashes:
             print(req.req)
         else:
-            print('%s' % req.req, end='')
+            print('%s' % (req.link if getattr(req, 'link', None) else req.req), end='')
             for hash in hashes:
                 print(' \\')
                 print('    --hash=sha256:%s' % hash, end='')
