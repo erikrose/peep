@@ -122,6 +122,7 @@ ITS_FINE_ITS_FINE = 0
 SOMETHING_WENT_WRONG = 1
 # "Traditional" for command-line errors according to optparse docs:
 COMMAND_LINE_ERROR = 2
+UNHANDLED_EXCEPTION = 3
 
 ARCHIVE_EXTENSIONS = ('.tar.bz2', '.tar.gz', '.tgz', '.tar', '.zip')
 
@@ -965,4 +966,4 @@ if __name__ == '__main__':
         exit(main())
     except Exception:
         exception_handler(*sys.exc_info())
-        exit(SOMETHING_WENT_WRONG)
+        exit(UNHANDLED_EXCEPTION)
