@@ -339,6 +339,33 @@ class FullStackTests(ServerTestCase):
             else:
                 self.fail("Peep exited successfully but shouldn't have.")
 
+    def test_distribution_not_found(self):
+        """Check that pip's DistributionNotFound exception (when a non-existent
+        version is specified) is handled gracefully."""
+        with running_setup_py(False):
+            try:
+                self.install_from_string("""useless==9.9.9""")
+            except CalledProcessError as exc:
+                eq_(exc.returncode, SOMETHING_WENT_WRONG)
+            else:
+                self.fail("Peep exited successfully but shouldn't have.")
+
+    def test_missing_requirements_file(self):
+        """Check that pip's InstallationError exception (when the specified
+        requirements file doesn't exist) is handled gracefully."""
+        try:
+            activate('pip>=0.8.3')
+        except RuntimeError:
+            raise SkipTest("This version of pip is so old that it doesn't even "
+                           "handle the IOError opening the file itself properly.")
+        with running_setup_py(False):
+            try:
+                self.install_from_path('nonexistent.txt')
+            except CalledProcessError as exc:
+                eq_(exc.returncode, SOMETHING_WENT_WRONG)
+            else:
+                self.fail("Peep exited successfully but shouldn't have.")
+
     def test_upgrade(self):
         """Make sure peep installing a GitHub-sourced tarball installs it,
         even if its version hasn't changed.
