@@ -86,6 +86,7 @@ except ImportError:
         from pip.util import url_to_path  # 0.7.0
     except ImportError:
         from pip.util import url_to_filename as url_to_path  # 0.6.2
+from pip.exceptions import InstallationError
 from pip.index import PackageFinder, Link
 try:
     from pip.log import logger
@@ -885,7 +886,7 @@ def peep_install(argv):
             first_every_last(buckets[SatisfiedReq], *printers)
 
         return ITS_FINE_ITS_FINE
-    except (UnsupportedRequirementError, DownloadError) as exc:
+    except (UnsupportedRequirementError, InstallationError, DownloadError) as exc:
         out(str(exc))
         return SOMETHING_WENT_WRONG
     finally:
