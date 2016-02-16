@@ -264,10 +264,12 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
-Unreleased:
+3.1.1
   * The "peep had a problem" traceback is no longer output for several cases
-    of pip installation errors that were not peep's fault. (For instance the
-    specified package version or requirements file not existing.)
+    of pip installation errors that were not peep's fault: for instance, the
+    specified package version or requirements file not existing.
+  * ``peep port`` now emits URLs for URL-based requirements, if you're using
+    pip 6.1.0 or greater. (jotes)
 
 3.1
   * Print the name each new requirements file we encounter during ``peep
