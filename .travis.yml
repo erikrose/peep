@@ -1,5 +1,10 @@
 sudo: false
 language: python
+python:
+  - "2.6"
+  - "2.7"
+  - "3.3"
+  - "3.4"
 cache:
   directories:
     - $HOME/.cache/pip
@@ -10,6 +15,11 @@ env:
 install:
   # Stick to a known-good version of tox, just in case:
   - pip install tox==1.9.2 virtualenv==13.1.2 flake8==2.4.0
+before_script:
+  # Work around Tox's lack of wildcard support. Results in a TOXENV that
+  # contains only the permutations for the current Python version. eg:
+  # TOXENV=py27-pip062,py27-pip063,py27-pip070,...
+  - export TOXENV=`tox --listenvs | grep "py${TRAVIS_PYTHON_VERSION/./}-" | tr '\n' ','`
 script:
   - flake8 --show-source
   - tox
