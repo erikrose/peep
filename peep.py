@@ -54,7 +54,7 @@ except ImportError:
     from urllib.parse import urlparse  # 3.4
 # TODO: Probably use six to make urllib stuff work across 2/3.
 
-from pkg_resources import require, VersionConflict, DistributionNotFound
+from pkg_resources import require, VersionConflict, DistributionNotFound, safe_name
 
 # We don't admit our dependency on pip in setup.py, lest a naive user simply
 # say `pip install peep.tar.gz` and thus pull down an untrusted copy of pip
@@ -665,6 +665,9 @@ class DownloadedReq(object):
         name = getattr(self._req.req, 'project_name', '')
         if name:
             return name
+        name = getattr(self._req.req, 'name', '')
+        if name:
+            return safe_name(name)
         raise ValueError('Requirement has no project_name.')
 
     def _name(self):
