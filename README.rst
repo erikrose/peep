@@ -264,6 +264,9 @@ If you're using pip 1.5, pass the ``--no-use-wheel`` argument.
 Version History
 ===============
 
+3.1.2
+  * Fix compatibility with pip 8.1.2. (abbeyj)
+
 3.1.1
   * The "peep had a problem" traceback is no longer output for several cases
     of pip installation errors that were not peep's fault: for instance, the
